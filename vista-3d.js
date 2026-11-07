@@ -712,29 +712,46 @@ function sampleRenderedSurfaceElevation(x, north, values, mask, width, height, e
 }
 
 function createTerrainSkirt(values, mask, width, height, extent, originX, originNorth, baseElevation, depthMeters = 80, bounds = extent) {
-  const perimeter = [];
-  const addEdge = (x0, n0, x1, n1, steps) => {
-    for (let i = 0; i < steps; i++) {
-      const t = i / steps;
-      perimeter.push({ x: x0+(x1-x0)*t, north: n0+(n1-n0)*t });
+  const gridWidth = width + 2, gridHeight = height + 2;
+  const nodes = new Array(gridWidth * gridHeight);
+  for (let row = 0; row < gridHeight; row++) for (let column = 0; column < gridWidth; column++) {
+    const sourceColumn = Math.max(0, Math.min(width - 1, column - 1));
+    const sourceRow = Math.max(0, Math.min(height - 1, row - 1));
+    const sourceIndex = sourceRow * width + sourceColumn;
+    nodes[row * gridWidth + column] = {
+      x: column === 0 ? extent.xmin : column === width + 1 ? extent.xmax : extent.xmin + (column - 0.5) * extent.pixelX,
+      north: row === 0 ? extent.ymax : row === height + 1 ? extent.ymin : extent.ymax - (row - 0.5) * extent.pixelY,
+      elevation: values[sourceIndex], valid: !mask[sourceIndex]
+    };
+  }
+  const edgeMap = new Map();
+  const vertexKey = point => Math.round(point.x * 1000) + ":" + Math.round(point.north * 1000);
+  const addFaceEdges = points => {
+    for (let i = 0; i < 3; i++) {
+      const a = points[i], b = points[(i + 1) % 3], ka = vertexKey(a), kb = vertexKey(b);
+      const key = ka < kb ? ka + "|" + kb : kb + "|" + ka;
+      const edge = edgeMap.get(key);
+      if (edge) edge.count++;
+      else edgeMap.set(key, { a, b, count: 1 });
     }
   };
-  const xSteps = Math.ceil((bounds.xmax-bounds.xmin)/extent.pixelX);
-  const nSteps = Math.ceil((bounds.ymax-bounds.ymin)/extent.pixelY);
-  addEdge(bounds.xmin,bounds.ymax,bounds.xmax,bounds.ymax,xSteps);
-  addEdge(bounds.xmax,bounds.ymax,bounds.xmax,bounds.ymin,nSteps);
-  addEdge(bounds.xmax,bounds.ymin,bounds.xmin,bounds.ymin,xSteps);
-  addEdge(bounds.xmin,bounds.ymin,bounds.xmin,bounds.ymax,nSteps);
+  for (let row = 0; row < gridHeight - 1; row++) for (let column = 0; column < gridWidth - 1; column++) {
+    const a = nodes[row * gridWidth + column], b = nodes[row * gridWidth + column + 1];
+    const c = nodes[(row + 1) * gridWidth + column], d = nodes[(row + 1) * gridWidth + column + 1];
+    if (!(a.valid && b.valid && c.valid && d.valid)) continue;
+    for (const triangle of [[a, b, c], [c, b, d]]) {
+      const clipped = clipToTile(triangle, bounds);
+      for (let i = 1; i < clipped.length - 1; i++) addFaceEdges([clipped[0], clipped[i], clipped[i + 1]]);
+    }
+  }
   const positions = [];
-  let wallSegments = 0;
   const bottomY = -depthMeters*CONFIG.verticalScale;
   const localPoint = (point,elevation) => [point.x-originX,(elevation-baseElevation)*CONFIG.verticalScale,point.north-originNorth];
-  for (let i=0;i<perimeter.length;i++) {
-    const a=perimeter[i], b=perimeter[(i+1)%perimeter.length];
-    const ea=sampleRenderedSurfaceElevation(a.x,a.north,values,mask,width,height,extent);
-    const eb=sampleRenderedSurfaceElevation(b.x,b.north,values,mask,width,height,extent);
-    if(ea===null||eb===null) continue;
-    const ta=localPoint(a,ea), tb=localPoint(b,eb), ba=[ta[0],bottomY,ta[2]], bb=[tb[0],bottomY,tb[2]];
+  let wallSegments = 0;
+  for (const edge of edgeMap.values()) {
+    if (edge.count !== 1) continue;
+    const a = edge.a, b = edge.b, ta = localPoint(a,a.elevation), tb = localPoint(b,b.elevation);
+    const ba = [ta[0],bottomY,ta[2]], bb = [tb[0],bottomY,tb[2]];
     positions.push(...ta,...tb,...ba,...tb,...bb,...ba);
     wallSegments++;
   }
@@ -750,7 +767,7 @@ function createTerrainSkirt(values, mask, width, height, extent, originX, origin
   geometry.computeVertexNormals(); geometry.computeBoundingSphere();
   const skirt=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color:0x51483d,roughness:1,metalness:0,side:THREE.DoubleSide}));
   skirt.name="terrain_perimeter_skirt";
-  skirt.userData={depthMeters,wallSegments,bottomElevation:baseElevation-depthMeters,bounds,crs:"EPSG:9377"};
+  skirt.userData={depthMeters,wallSegments,perimeterEdges:edgeMap.size,bottomElevation:baseElevation-depthMeters,bounds,crs:"EPSG:9377"};
   return skirt;
 }
 
@@ -1093,10 +1110,12 @@ async function initializeScene() {
   controls.dampingFactor = 0.09;
   controls.enableRotate = true;
   controls.enablePan = true;
-  controls.rotateSpeed = 0.65;
-  controls.zoomSpeed = 0.7;
-  controls.panSpeed = 0.55;
-  controls.screenSpacePanning = false;
+  controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+  controls.rotateSpeed = 0.8;
+  controls.zoomSpeed = 1;
+  controls.panSpeed = 0.9;
+  controls.zoomToCursor = true;
+  controls.screenSpacePanning = true;
   controls.minPolarAngle = 0.12;
   controls.maxPolarAngle = Math.PI / 2 - 0.015;
   controls.minDistance = 20;
@@ -1230,7 +1249,7 @@ async function main() {
     terrainLayer.add(mesh);
     materials.push(material);
   }
-  const terrainSkirt = createTerrainSkirt(elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation, CONFIG.terrainSkirtDepthMeters, extent);
+  const terrainSkirt = createTerrainSkirt(elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation, CONFIG.terrainSkirtDepthMeters, textureCoverage.intersection);
   terrainLayer.add(terrainSkirt);
   scene.add(terrainLayer);
   const bufferLayer = addPolygonOverlay(scene, bufferSource, null, "buffer", elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
@@ -1251,7 +1270,7 @@ async function main() {
   const center = new THREE.Vector3(0, (analysis.maximum - baseElevation) * CONFIG.verticalScale * 0.35, 0);
   controls.target.copy(center);
   const span = Math.max(extent.xmax - extent.xmin, extent.ymax - extent.ymin);
-  camera.position.set(span * 0.9, span * 0.72, -span * 1.05);
+  camera.position.set(span * 0.7, span * 1.2, -span * 0.7);
   camera.lookAt(center);
   camera.updateProjectionMatrix();
   controls.update();
