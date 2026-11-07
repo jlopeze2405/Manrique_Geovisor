@@ -29,10 +29,10 @@ const CONFIG = Object.freeze({
   bufferProjectionUrl: "data/Buffer_Area_Estudio/Bff_Uva.prj",
   estimatedHeightPerFloor: 2.1,
   terrainSkirtDepthMeters: 80,
-  manifestUrl: "data/Raster/ortho_tiles_download/tiles.json",
-  textureFolderUrl: "data/Raster/ortho_tiles_download/",
+  manifestUrl: "data/Raster/ortho_tiles_fast/tiles.json",
+  textureFolderUrl: "data/Raster/ortho_tiles_fast/",
   extentToleranceMeters: 0.00001,
-  maxPixelRatio: 1.5
+  maxPixelRatio: 1.25
 });
 
 const container = document.getElementById("threeContainer");
@@ -816,11 +816,11 @@ function validateManifest(manifest, extent) {
   const imageExtent = manifest.sourceExtent;
   const expected = new Set();
   for (let row = 1; row <= 3; row++) {
-    for (let column = 1; column <= 4; column++) expected.add("ortho_r" + String(row).padStart(2, "0") + "_c" + String(column).padStart(2, "0") + ".png");
+    for (let column = 1; column <= 4; column++) expected.add("ortho_r" + String(row).padStart(2, "0") + "_c" + String(column).padStart(2, "0") + ".jpg");
   }
   for (const tile of manifest.tiles) {
     if (!expected.has(tile.filename)) throw new Error("Nombre inesperado en tiles.json: " + tile.filename);
-    if (tile.width !== 3914 || tile.height !== 3648) throw new Error("Dimensiones incorrectas en el manifiesto: " + tile.filename);
+    if (tile.width !== 1024 || tile.height !== 953) throw new Error("Dimensiones incorrectas en el manifiesto: " + tile.filename);
     if (tile.bboxSR !== 9377 || tile.imageSR !== 9377) throw new Error("CRS incorrecto en el manifiesto: " + tile.filename);
     if (![tile.bbox.xmin, tile.bbox.ymin, tile.bbox.xmax, tile.bbox.ymax].every(Number.isFinite)) throw new Error("bbox inválido: " + tile.filename);
   }
@@ -1046,7 +1046,7 @@ async function loadTexture(loader, tile) {
   texture.minFilter = THREE.LinearMipmapLinearFilter;
   texture.generateMipmaps = true;
   const maxAnisotropy = renderer.capabilities && renderer.capabilities.getMaxAnisotropy ? renderer.capabilities.getMaxAnisotropy() : 1;
-  texture.anisotropy = Math.min(8, maxAnisotropy);
+  texture.anisotropy = Math.min(4, maxAnisotropy);
   texture.needsUpdate = true;
   return texture;
 }
@@ -1152,8 +1152,8 @@ async function main() {
   const maxTextureSize = renderer.backend && renderer.backend.device && renderer.backend.device.limits
     ? renderer.backend.device.limits.maxTextureDimension2D
     : renderer.capabilities && Number.isFinite(renderer.capabilities.maxTextureSize) ? renderer.capabilities.maxTextureSize : Infinity;
-  if (maxTextureSize < 3914) {
-    throw new Error("La GPU admite texturas de hasta " + maxTextureSize + " px; se requieren al menos 3914 px.");
+  if (maxTextureSize < 1024) {
+    throw new Error("La GPU admite texturas de hasta " + maxTextureSize + " px; se requieren al menos 1024 px.");
   }
   setStatus("Leyendo manifiesto y georreferencia del DEM…");
   const [manifest, world, tiff, buildingSource, buildingAttributes, parcelSource, riskSource, riskAttributes, threatSource, threatAttributes, bufferSource] = await Promise.all([
@@ -1216,10 +1216,13 @@ async function main() {
   const textureLoader = new THREE.TextureLoader();
   const tiles = [...manifest.tiles].sort((a, b) => a.row - b.row || a.column - b.column);
   const textures = new Map();
-  for (let i = 0; i < tiles.length; i++) {
-    setStatus("Cargando textura " + (i + 1) + " de " + tiles.length + ": " + tiles[i].filename + "…");
-    textures.set(tiles[i].filename, await loadTexture(textureLoader, tiles[i]));
-  }
+  let loadedTextures = 0;
+  await Promise.all(tiles.map(async tile => {
+    const texture = await loadTexture(textureLoader, tile);
+    textures.set(tile.filename, texture);
+    loadedTextures++;
+    setStatus("Cargando ortofoto optimizada: " + loadedTextures + " de " + tiles.length + " teselas…");
+  }));
   setStatus("Texturas cargadas. Construyendo malla y recortando los parches en sus límites geográficos…");
   const gridWidth = width + 2;
   const gridHeight = height + 2;
@@ -1242,9 +1245,9 @@ async function main() {
   for (const tile of tiles) {
     const result = buildTileGeometry(tile, elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
     renderedTriangles += result.triangles;
-    const material = new THREE.MeshStandardMaterial({ map: textures.get(tile.filename), roughness: 1, metalness: 0, side: THREE.DoubleSide, transparent: true, alphaTest: 0.005, depthWrite: true });
+    const material = new THREE.MeshStandardMaterial({ map: textures.get(tile.filename), roughness: 1, metalness: 0, side: THREE.DoubleSide });
     const mesh = new THREE.Mesh(result.geometry, material);
-    mesh.name = "terrain_" + tile.filename.replace(".png", "");
+    mesh.name = "terrain_" + tile.filename.replace(".jpg", "");
     mesh.userData = { filename: tile.filename, bbox: tile.bbox, row: tile.row, column: tile.column };
     terrainLayer.add(mesh);
     materials.push(material);
@@ -1276,7 +1279,7 @@ async function main() {
   controls.update();
   setupNavigationButtons(camera, controls);
   const dropped = (width + 1) * (height + 1) - validSurfaceQuads;
-  const byteEstimate = tiles.length * 3914 * 3648 * 4;
+  const byteEstimate = tiles.reduce((total, tile) => total + tile.width * tile.height * 4, 0);
   const gpuEstimate = byteEstimate * 4 / 3;
   const coveragePercent = textureCoverage.coverageRatio * 100;
   const uncoveredNorth = Math.max(0, extent.ymax - textureCoverage.imageExtent.ymax);
