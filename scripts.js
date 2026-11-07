@@ -1122,11 +1122,8 @@
   loadShapefileOverlay('data/Construcciones_Area_Estudio/Construcciones_Area_Estudio', 'Construcciones del área de estudio', '#e76f51');
   loadShapefileOverlay('data/Predios/Predios_Influencia', 'Predios de la zona de influencia', '#9b5de5');
   loadShapefileOverlay('data/RIESGO_MOV_MASA/RIESGO_MOV_MASA', 'Riesgo por movimiento en masa', '#4361ee');
-  loadGeoTiffOverlay('data/Raster/10x10_Zona_Estudio.tif', 'Elevación del área · 10 m', {}, '#2878b5', false);
-  loadGeoTiffOverlay('data/Raster/ZONA_ESTUDIO.tif', 'DEM del área de estudio', {}, '#1f6e8c', false);
-  loadGeoTiffOverlay('data/Raster/Slope_10x10.tif', 'Pendiente · 10 m', {}, '#a65d25', false);
-  loadGeoTiffOverlay('data/Raster/Reclassify_10x10.tif', 'Ráster reclasificado · 10 m', {}, '#8b5e9d', false);
-  loadGeoTiffOverlay('data/Raster/hillshade_10x10.tif', 'Sombreado del terreno · 10 m', {}, '#64748b', false);
+  // Los GeoTIFF se conservan como insumos analíticos del escenario 3D;
+  // no son capas vectoriales del panel Catastro y territorio.
   function updateActionButtons() {
     var active = !!activeAction;
     finishButton.disabled = !active || (activeAction && activeAction.kind === 'draw' && activeAction.type === 'marker') || vertices.length < (activeAction && activeAction.type === 'polygon' ? 3 : 2);

@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $git = 'C:\Program Files\Git\cmd\git.exe'
-$logRoot = Join-Path $env:LOCALAPPDATA 'ManriqueGeovisorAutoPublish'
+$logRoot = Join-Path $env:TEMP 'ManriqueGeovisorAutoPublish'
 $logFile = Join-Path $logRoot 'watcher.log'
 $quietSeconds = 8
 
