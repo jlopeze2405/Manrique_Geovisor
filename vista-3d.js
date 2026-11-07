@@ -405,31 +405,48 @@ function buildingPolygonParts(feature) {
 
 function addPolygonOverlay(scene, source, categoryValues, kind, values, mask, width, height, extent, originX, originNorth, baseElevation) {
   const positions = [], colors = [], indices = [], outlines = [], outlineColors = [], counts = {};
+  const maxTriangleEdge = kind === "buffer" ? 5 : 8;
+  let skippedTriangles = 0;
+  const pushDrapedTriangle = (points, color, lift) => {
+    const ground = points.map(point => sampleRenderedSurfaceElevation(point.x, point.north, values, mask, width, height, extent));
+    if (ground.some(value => value === null)) { skippedTriangles++; return; }
+    const first = positions.length / 3;
+    for (let vertex = 0; vertex < 3; vertex++) {
+      positions.push(points[vertex].x - originX, (ground[vertex] - baseElevation) * CONFIG.verticalScale + lift, points[vertex].north - originNorth);
+      colors.push(color.r, color.g, color.b);
+    }
+    indices.push(first, first + 1, first + 2);
+  };
   for (const feature of source.features) {
     const symbol = categoryValues ? (kind === "risk" ? riskSymbol(categoryValues.values[feature.id - 1]) : threatSymbol(categoryValues.values[feature.id - 1])) : null;
-    const color = symbol ? new THREE.Color(symbol.hex) : (kind === "buffer" ? new THREE.Color(0xf5b335) : null);
+    const color = symbol ? new THREE.Color(symbol.hex) : (kind === "buffer" ? new THREE.Color(0xf5b335) : new THREE.Color(0x78879a));
     if (symbol) counts[symbol.key] = (counts[symbol.key] || 0) + 1;
     for (const part of buildingPolygonParts(feature)) {
-      const points = [part.shell, ...part.holes].flat();
-      const ground = points.map(point => sampleRenderedSurfaceElevation(point.x, point.north, values, mask, width, height, extent));
-      if (ground.some(e => e === null)) continue;
+      const partPoints = part.shell.concat(...part.holes);
       const triangles = THREE.ShapeUtils.triangulateShape(part.shell.map(p => new THREE.Vector2(p.x,p.north)), part.holes.map(r => r.map(p => new THREE.Vector2(p.x,p.north))));
-      const vertexOffset = positions.length / 3;
-      for (let index = 0; index < points.length; index++) {
-        const point = points[index], y = (ground[index] - baseElevation) * CONFIG.verticalScale + (kind === "risk" ? 0.82 : (kind === "buffer" ? 0.65 : 0.96));
-        positions.push(point.x-originX,y,point.north-originNorth);
-        colors.push(color ? color.r : 0.45,color ? color.g : 0.5,color ? color.b : 0.55);
+      const lift = kind === "risk" ? 0.12 : (kind === "buffer" ? 0.1 : 0.14);
+      for (const triangle of triangles) {
+        const corners = triangle.map(index => partPoints[index]);
+        const [a, b, c] = corners;
+        const steps = Math.max(1, Math.ceil(Math.max(Math.hypot(b.x-a.x,b.north-a.north), Math.hypot(c.x-b.x,c.north-b.north), Math.hypot(a.x-c.x,a.north-c.north)) / maxTriangleEdge));
+        const pointAt = (i, j) => ({ x: a.x + (b.x-a.x)*i/steps + (c.x-a.x)*j/steps, north: a.north + (b.north-a.north)*i/steps + (c.north-a.north)*j/steps });
+        for (let i = 0; i < steps; i++) for (let j = 0; j < steps - i; j++) {
+          pushDrapedTriangle([pointAt(i,j),pointAt(i+1,j),pointAt(i,j+1)],color,lift);
+          if (i + j < steps - 1) pushDrapedTriangle([pointAt(i+1,j),pointAt(i+1,j+1),pointAt(i,j+1)],color,lift);
+        }
       }
-      for (const tri of triangles) indices.push(vertexOffset + tri[0], vertexOffset + tri[1], vertexOffset + tri[2]);
-      let ringIndex = 0;
       for (const ring of [part.shell, ...part.holes]) {
         for (let i=0;i<ring.length;i++) {
-          const a=ring[i], b=ring[(i+1)%ring.length], lift=kind === "risk" ? 0.9 : (kind === "buffer" ? 0.78 : 1.04);
-          outlines.push(a.x-originX,(ground[ringIndex+i]-baseElevation)*CONFIG.verticalScale+lift,a.north-originNorth,
-            b.x-originX,(ground[ringIndex+(i+1)%ring.length]-baseElevation)*CONFIG.verticalScale+lift,b.north-originNorth);
-          for (let vertex=0; vertex<2; vertex++) outlineColors.push(color ? color.r : 0.45,color ? color.g : 0.5,color ? color.b : 0.55);
+          const a=ring[i], b=ring[(i+1)%ring.length], steps=Math.max(1,Math.ceil(Math.hypot(b.x-a.x,b.north-a.north)/3));
+          for(let step=0;step<steps;step++){
+            const t0=step/steps,t1=(step+1)/steps;
+            const p0={x:a.x+(b.x-a.x)*t0,north:a.north+(b.north-a.north)*t0},p1={x:a.x+(b.x-a.x)*t1,north:a.north+(b.north-a.north)*t1};
+            const e0=sampleRenderedSurfaceElevation(p0.x,p0.north,values,mask,width,height,extent),e1=sampleRenderedSurfaceElevation(p1.x,p1.north,values,mask,width,height,extent);
+            if(e0===null||e1===null)continue;
+            outlines.push(p0.x-originX,(e0-baseElevation)*CONFIG.verticalScale+lift+0.04,p0.north-originNorth,p1.x-originX,(e1-baseElevation)*CONFIG.verticalScale+lift+0.04,p1.north-originNorth);
+            for(let vertex=0;vertex<2;vertex++)outlineColors.push(color.r,color.g,color.b);
+          }
         }
-        ringIndex += ring.length;
       }
     }
   }
@@ -440,7 +457,7 @@ function addPolygonOverlay(scene, source, categoryValues, kind, values, mask, wi
     mesh.name = kind + "_fills"; layer.add(mesh);
   }
   if (outlines.length) { const geometry=new THREE.BufferGeometry(); geometry.setAttribute("position",new THREE.Float32BufferAttribute(outlines,3)); geometry.setAttribute("color",new THREE.Float32BufferAttribute(outlineColors,3)); geometry.computeBoundingSphere(); layer.add(new THREE.LineSegments(geometry,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:1,depthTest:true,toneMapped:false}))); }
-  layer.userData={featureCount:source.features.length,sourceRecordCount:source.recordCount,categoryCounts:counts,vertexCount:positions.length/3,triangleCount:indices.length/3,drawCalls:(positions.length?1:0)+(outlines.length?1:0),source:kind === "risk" ? CONFIG.riskUrl : kind === "threat" ? CONFIG.threatUrl : (kind === "buffer" ? CONFIG.bufferUrl : CONFIG.parcelsUrl),crs:"EPSG:9377",dbfField:categoryValues && categoryValues.fieldName};
+  layer.userData={featureCount:source.features.length,sourceRecordCount:source.recordCount,categoryCounts:counts,vertexCount:positions.length/3,triangleCount:indices.length/3,skippedTriangles,drawCalls:(positions.length?1:0)+(outlines.length?1:0),source:kind === "risk" ? CONFIG.riskUrl : kind === "threat" ? CONFIG.threatUrl : (kind === "buffer" ? CONFIG.bufferUrl : CONFIG.parcelsUrl),crs:"EPSG:9377",dbfField:categoryValues && categoryValues.fieldName};
   scene.add(layer); return layer;
 }
 
