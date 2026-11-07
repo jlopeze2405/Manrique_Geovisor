@@ -1,0 +1,57 @@
+﻿<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#edf3f7">
+  <title>Vista 3D · GeoVisor Manrique</title>
+  <style>
+    :root{font-family:Inter,Manrope,"Segoe UI",Arial,sans-serif;color:#173b5e;background:#edf3f7}
+    *{box-sizing:border-box}html,body{width:100%;height:100%;margin:0}body{background:#edf3f7}
+    .shell{height:100%;min-height:560px;display:grid;grid-template-columns:320px minmax(0,1fr);gap:14px;padding:14px}
+    .panel,.stage{border:1px solid #ffffffd4;border-radius:16px;background:#ffffffd9;box-shadow:0 10px 34px #143b5b18}
+    .panel{z-index:2;display:flex;flex-direction:column;gap:17px;padding:21px;overflow:auto}
+    .brand{display:flex;align-items:center;gap:12px}.mark{display:grid;place-items:center;width:42px;height:42px;border:1px solid #1976d255;border-radius:13px;color:#1976d2;font-weight:800;background:#fff}
+    .eyebrow{margin:0 0 4px;color:#627d98;font-size:9px;letter-spacing:.14em;font-weight:800}.brand h1{margin:0;font-size:20px;color:#0b2e59}.brand h1 span{color:#1976d2}.sub{margin:5px 0 0;color:#627d98;font-size:11px}
+    .tag{display:inline-flex;align-items:center;gap:7px;width:max-content;padding:7px 10px;border:1px solid #b8d8c3;border-radius:99px;color:#24633b;background:#f0faf3;font-size:10px;font-weight:700}.tag i{width:7px;height:7px;border-radius:50%;background:#2b9b59}
+    .section{padding-top:15px;border-top:1px solid #dbe6ee}.section h2{margin:0 0 9px;color:#0b2e59;font-size:12px}.instructions{display:grid;gap:7px;margin:0;padding-left:17px;color:#526b82;font-size:10px;line-height:1.5}
+    .layer-list{display:grid;gap:9px}.layer-toggle{display:flex;align-items:center;gap:9px;color:#526b82;font-size:11px;cursor:pointer}.layer-toggle input{width:15px;height:15px;margin:0;accent-color:#1976d2}.layer-toggle input:disabled{cursor:wait}.layer-swatch{width:12px;height:3px;border-radius:2px;background:#1976d2}.layer-swatch.buffer{height:0;border-top:3px solid #d49400;background:transparent}.layer-swatch.buildings{height:10px;border:1px solid #5c321e;background:#c87945}.layer-swatch.estimated{height:10px;border:1px solid #402b25;background:linear-gradient(90deg,#b42332 0 25%,#e87516 25% 50%,#d6a41d 50% 75%,#8b9d26 75%)}.layer-swatch.parcels{height:0;border-top:2px solid #47c4d1;background:transparent}.layer-swatch.risk{height:10px;background:#b42332;border:1px solid #7b2028}.layer-swatch.threat{height:10px;background:#e98b16;border:1px solid #9d5510}.estimate-note{margin:0 0 0 24px;color:#735718;font-size:9px;line-height:1.45}.legend{margin:9px 0 0 24px;padding:8px;border:1px solid #dbe6ee;border-radius:8px;background:#f7fafc}.legend summary{font-size:10px;font-weight:700;color:#365b7d;cursor:pointer}.legend-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px 8px;margin-top:8px}.legend-item{display:flex;align-items:center;gap:5px;font-size:9px;color:#526b82}.legend-item i{width:9px;height:9px;flex:0 0 9px;border-radius:2px}.nav-buttons{display:flex;gap:7px;margin-top:10px}.nav-buttons button{flex:1;padding:7px 9px;border:1px solid #c8d9e6;border-radius:8px;background:#fff;color:#315674;font:inherit;font-size:10px;font-weight:600;cursor:pointer}.nav-buttons button:hover{background:#edf6fb;border-color:#83b2d1}.nav-buttons button:focus-visible{outline:2px solid #1976d2;outline-offset:2px}
+    .message,.diagnostics{padding:11px 12px;border:1px solid #bad8e6;border-radius:10px;background:#eff8fc;color:#15526c;font-size:10px;line-height:1.5;overflow-wrap:anywhere}.message.is-error{border-color:#e7b9b9;background:#fff1f1;color:#9b2727}.message.is-warning{border-color:#ead9aa;background:#fff9e9;color:#735718}.diagnostics{color:#526b82;background:#f7fafc;border-color:#dbe6ee}.diagnostics strong{color:#0b2e59}
+    .back-link{margin-top:auto;padding-top:12px;border-top:1px solid #dbe6ee;color:#0b5ca8;text-decoration:none;font-size:10px;font-weight:700}.back-link:hover{text-decoration:underline}
+    .stage{position:relative;min-width:0;min-height:0;overflow:hidden;background:#dceaf1}#threeContainer{position:absolute;inset:0}#threeContainer canvas{display:block;width:100%;height:100%}
+    .map-label{position:absolute;z-index:2;top:13px;left:13px;max-width:calc(100% - 26px);padding:9px 12px;border:1px solid #ffffffd9;border-radius:9px;background:#fffffff0;color:#365b7d;font-size:10px;pointer-events:none}
+    @media(max-width:760px){.shell{height:auto;min-height:100%;grid-template-columns:1fr;grid-template-rows:auto minmax(60vh,1fr);padding:8px;gap:8px}.panel{gap:12px;padding:15px}.back-link{margin-top:0}.stage{min-height:60vh}.map-label{top:8px;left:8px}}
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
+        "geotiff": "https://esm.sh/geotiff@2.1.3"
+      }
+    }
+  </script>
+</head>
+<body>
+  <main class="shell">
+    <aside class="panel" aria-label="Información del escenario 3D">
+      <header class="brand"><div class="mark" aria-hidden="true">G<span>+</span></div><div><p class="eyebrow">PUBLICACIÓN DE DATOS SIG</p><h1>Geo<span>Visor</span> · 3D</h1><p class="sub">Manrique · Medellín, Colombia</p></div></header>
+      <div class="tag"><i aria-hidden="true"></i> Terreno local · EPSG:9377</div>
+      <section class="section"><h2>Navegación</h2><ul class="instructions"><li>Arrastra con botón izquierdo para girar.</li><li>Rueda o botones para acercar y alejar.</li><li>Botón derecho para desplazar; “Centrar” restaura la vista.</li></ul><div class="nav-buttons" aria-label="Controles de vista"><button id="nav-zoom-in" type="button" aria-label="Acercar">＋ Acercar</button><button id="nav-zoom-out" type="button" aria-label="Alejar">− Alejar</button><button id="nav-reset" type="button">Centrar</button></div></section>
+      <section class="section" aria-label="Capas del escenario"><h2>Capas</h2><div class="layer-list"><label class="layer-toggle"><input id="layer-terrain" type="checkbox" checked disabled><span class="layer-swatch" aria-hidden="true"></span><span>Terreno y ortofoto</span></label><label class="layer-toggle"><input id="layer-buildings" type="checkbox" checked disabled><span class="layer-swatch buildings" aria-hidden="true"></span><span>Huellas de construcciones</span></label><label class="layer-toggle"><input id="layer-building-volumes" type="checkbox" checked disabled><span class="layer-swatch estimated" aria-hidden="true"></span><span>Volúmenes estimados por riesgo</span></label><label class="layer-toggle"><input id="layer-parcels" type="checkbox" disabled><span class="layer-swatch parcels" aria-hidden="true"></span><span>Lotes</span></label><label class="layer-toggle"><input id="layer-risk" type="checkbox" disabled><span class="layer-swatch risk" aria-hidden="true"></span><span>Zonificación de riesgo</span></label><label class="layer-toggle"><input id="layer-threat" type="checkbox" disabled><span class="layer-swatch threat" aria-hidden="true"></span><span>Amenaza por movimientos en masa</span></label><p class="estimate-note">El límite del área no está disponible porque falta su shapefile. Alturas estimadas: 2,10 m por piso; no corresponden a mediciones verificadas.</p><details class="legend"><summary>Simbología de riesgo y amenaza</summary><div class="legend-grid"><span class="legend-item"><i style="background:#b42332"></i>Alto no mitigable / amenaza alta</span><span class="legend-item"><i style="background:#e87516"></i>Alto mitigable</span><span class="legend-item"><i style="background:#d6a41d"></i>Riesgo medio</span><span class="legend-item"><i style="background:#8b9d26"></i>Con condiciones</span><span class="legend-item"><i style="background:#21845b"></i>Bajo / amenaza baja</span><span class="legend-item"><i style="background:#78879a"></i>Sin clasificar</span><span class="legend-item"><i style="background:#e98b16"></i>Amenaza media</span></div></details></div></section>
+      <div id="load-state" class="message" role="status" aria-live="polite">Preparando el terreno local…</div>
+      <div id="terrain-diagnostics" class="diagnostics" aria-live="polite">El análisis de NoData aparecerá antes de construir la superficie.</div>
+      <a class="back-link" href="index.html">← Volver al geovisor 2D</a>
+    </aside>
+    <section class="stage" aria-label="Terreno local tridimensional"><div id="threeContainer"></div><div class="map-label">DEM 10 × 10 m · ortofoto Medellín 2024 · norte hacia +Z</div></section>
+  </main>
+  <script type="module" src="vista-3d.js?v=buffer-drape-skirt-2"></script>
+<script>
+document.querySelector('script[type="module"][src^="vista-3d.js"]').addEventListener('error', function(){
+  var status = document.getElementById('load-state');
+  status.textContent = 'No se pudo iniciar el módulo 3D o cargar sus bibliotecas. Comprueba la conexión a Internet y vuelve a abrir esta página desde Live Server.';
+  status.classList.add('is-error');
+});
+</script>
+</body>
+</html>

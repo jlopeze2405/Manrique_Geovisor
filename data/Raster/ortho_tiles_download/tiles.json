@@ -1,0 +1,248 @@
+﻿{
+    "service":  "https://www.medellin.gov.co/servidormapas/rest/services/ServiciosImagen/Ortofoto_Medellin_2024/ImageServer/exportImage",
+    "crs":  "EPSG:9377",
+    "grid":  {
+                 "columns":  4,
+                 "rows":  3
+             },
+    "sourceExtent":  {
+                         "xmin":  4717579.25060521,
+                         "ymin":  2251472.89126679,
+                         "xmax":  4719639.25060521,
+                         "ymax":  2252912.89126679
+                     },
+    "tileDimensionsPixels":  {
+                                 "width":  3914,
+                                 "height":  3648
+                             },
+    "tiles":  [
+                  {
+                      "index":  1,
+                      "row":  1,
+                      "column":  1,
+                      "filename":  "ortho_r01_c01.png",
+                      "bbox":  {
+                                   "xmin":  4717579.25060521,
+                                   "ymin":  2252432.89126679,
+                                   "xmax":  4718094.25060521,
+                                   "ymax":  2252912.89126679
+                               },
+                      "bboxSR":  9377,
+                      "imageSR":  9377,
+                      "width":  3914,
+                      "height":  3648,
+                      "resolutionMetersPerPixel":  0.13157894736842105,
+                      "format":  "png32",
+                      "url":  "https://www.medellin.gov.co/servidormapas/rest/services/ServiciosImagen/Ortofoto_Medellin_2024/ImageServer/exportImage?bbox=4717579.25060521,2252432.89126679,4718094.25060521,2252912.89126679\u0026bboxSR=9377\u0026imageSR=9377\u0026size=3914,3648\u0026format=png32\u0026f=image"
+                  },
+                  {
+                      "index":  2,
+                      "row":  1,
+                      "column":  2,
+                      "filename":  "ortho_r01_c02.png",
+                      "bbox":  {
+                                   "xmin":  4718094.25060521,
+                                   "ymin":  2252432.89126679,
+                                   "xmax":  4718609.25060521,
+                                   "ymax":  2252912.89126679
+                               },
+                      "bboxSR":  9377,
+                      "imageSR":  9377,
+                      "width":  3914,
+                      "height":  3648,
+                      "resolutionMetersPerPixel":  0.13157894736842105,
+                      "format":  "png32",
+                      "url":  "https://www.medellin.gov.co/servidormapas/rest/services/ServiciosImagen/Ortofoto_Medellin_2024/ImageServer/exportImage?bbox=4718094.25060521,2252432.89126679,4718609.25060521,2252912.89126679\u0026bboxSR=9377\u0026imageSR=9377\u0026size=3914,3648\u0026format=png32\u0026f=image"
+                  },
+                  {
+                      "index":  3,
+                      "row":  1,
+                      "column":  3,
+                      "filename":  "ortho_r01_c03.png",
+                      "bbox":  {
+                                   "xmin":  4718609.25060521,
+                                   "ymin":  2252432.89126679,
+                                   "xmax":  4719124.25060521,
+                                   "ymax":  2252912.89126679
+                               },
+                      "bboxSR":  9377,
+                      "imageSR":  9377,
+                      "width":  3914,
+                      "height":  3648,
+                      "resolutionMetersPerPixel":  0.13157894736842105,
+                      "format":  "png32",
+                      "url":  "https://www.medellin.gov.co/servidormapas/rest/services/ServiciosImagen/Ortofoto_Medellin_2024/ImageServer/exportImage?bbox=4718609.25060521,2252432.89126679,4719124.25060521,2252912.89126679\u0026bboxSR=9377\u0026imageSR=9377\u0026size=3914,3648\u0026format=png32\u0026f=image"
+                  },
+                  {
+                      "index":  4,
+                      "row":  1,
+                      "column":  4,
+                      "filename":  "ortho_r01_c04.png",
+                      "bbox":  {
+                                   "xmin":  4719124.25060521,
+                                   "ymin":  2252432.89126679,
+                                   "xmax":  4719639.25060521,
+                                   "ymax":  2252912.89126679
+                               },
+                      "bboxSR":  9377,
+                      "imageSR":  9377,
+                      "width":  3914,
+                      "height":  3648,
+                      "resolutionMetersPerPixel":  0.13157894736842105,
+                      "format":  "png32",
+                      "url":  "https://www.medellin.gov.co/servidormapas/rest/services/ServiciosImagen/Ortofoto_Medellin_2024/ImageServer/exportImage?bbox=4719124.25060521,2252432.89126679,4719639.25060521,2252912.89126679\u0026bboxSR=9377\u0026imageSR=9377\u0026size=3914,3648\u0026format=png32\u0026f=image"
+                  },
+                  {
+                      "index":  5,
+                      "row":  2,
+                      "column":  1,
+                      "filename":  "ortho_r02_c01.png",
+                      "bbox":  {
+                                   "xmin":  4717579.25060521,
+                                   "ymin":  2251952.89126679,
+                                   "xmax":  4718094.25060521,
+                                   "ymax":  2252432.89126679
+                               },
+                      "bboxSR":  9377,
+                      "imageSR":  9377,
+                      "width":  3914,
+                      "height":  3648,
+                      "resolutionMetersPerPixel":  0.13157894736842105,
+                      "format":  "png32",
+                      "url":  "https://www.medellin.gov.co/servidormapas/rest/services/ServiciosImagen/Ortofoto_Medellin_2024/ImageServer/exportImage?bbox=4717579.25060521,2251952.89126679,4718094.25060521,2252432.89126679\u0026bboxSR=9377\u0026imageSR=9377\u0026size=3914,3648\u0026format=png32\u0026f=image"
+                  },
+                  {
+                      "index":  6,
+                      "row":  2,
+                      "column":  2,
+                      "filename":  "ortho_r02_c02.png",
+                      "bbox":  {
+                                   "xmin":  4718094.25060521,
+                                   "ymin":  2251952.89126679,
+                                   "xmax":  4718609.25060521,
+                                   "ymax":  2252432.89126679
+                               },
+                      "bboxSR":  9377,
+                      "imageSR":  9377,
+                      "width":  3914,
+                      "height":  3648,
+                      "resolutionMetersPerPixel":  0.13157894736842105,
+                      "format":  "png32",
+                      "url":  "https://www.medellin.gov.co/servidormapas/rest/services/ServiciosImagen/Ortofoto_Medellin_2024/ImageServer/exportImage?bbox=4718094.25060521,2251952.89126679,4718609.25060521,2252432.89126679\u0026bboxSR=9377\u0026imageSR=9377\u0026size=3914,3648\u0026format=png32\u0026f=image"
+                  },
+                  {
+                      "index":  7,
+                      "row":  2,
+                      "column":  3,
+                      "filename":  "ortho_r02_c03.png",
+                      "bbox":  {
+                                   "xmin":  4718609.25060521,
+                                   "ymin":  2251952.89126679,
+                                   "xmax":  4719124.25060521,
+                                   "ymax":  2252432.89126679
+                               },
+                      "bboxSR":  9377,
+                      "imageSR":  9377,
+                      "width":  3914,
+                      "height":  3648,
+                      "resolutionMetersPerPixel":  0.13157894736842105,
+                      "format":  "png32",
+                      "url":  "https://www.medellin.gov.co/servidormapas/rest/services/ServiciosImagen/Ortofoto_Medellin_2024/ImageServer/exportImage?bbox=4718609.25060521,2251952.89126679,4719124.25060521,2252432.89126679\u0026bboxSR=9377\u0026imageSR=9377\u0026size=3914,3648\u0026format=png32\u0026f=image"
+                  },
+                  {
+                      "index":  8,
+                      "row":  2,
+                      "column":  4,
+                      "filename":  "ortho_r02_c04.png",
+                      "bbox":  {
+                                   "xmin":  4719124.25060521,
+                                   "ymin":  2251952.89126679,
+                                   "xmax":  4719639.25060521,
+                                   "ymax":  2252432.89126679
+                               },
+                      "bboxSR":  9377,
+                      "imageSR":  9377,
+                      "width":  3914,
+                      "height":  3648,
+                      "resolutionMetersPerPixel":  0.13157894736842105,
+                      "format":  "png32",
+                      "url":  "https://www.medellin.gov.co/servidormapas/rest/services/ServiciosImagen/Ortofoto_Medellin_2024/ImageServer/exportImage?bbox=4719124.25060521,2251952.89126679,4719639.25060521,2252432.89126679\u0026bboxSR=9377\u0026imageSR=9377\u0026size=3914,3648\u0026format=png32\u0026f=image"
+                  },
+                  {
+                      "index":  9,
+                      "row":  3,
+                      "column":  1,
+                      "filename":  "ortho_r03_c01.png",
+                      "bbox":  {
+                                   "xmin":  4717579.25060521,
+                                   "ymin":  2251472.89126679,
+                                   "xmax":  4718094.25060521,
+                                   "ymax":  2251952.89126679
+                               },
+                      "bboxSR":  9377,
+                      "imageSR":  9377,
+                      "width":  3914,
+                      "height":  3648,
+                      "resolutionMetersPerPixel":  0.13157894736842105,
+                      "format":  "png32",
+                      "url":  "https://www.medellin.gov.co/servidormapas/rest/services/ServiciosImagen/Ortofoto_Medellin_2024/ImageServer/exportImage?bbox=4717579.25060521,2251472.89126679,4718094.25060521,2251952.89126679\u0026bboxSR=9377\u0026imageSR=9377\u0026size=3914,3648\u0026format=png32\u0026f=image"
+                  },
+                  {
+                      "index":  10,
+                      "row":  3,
+                      "column":  2,
+                      "filename":  "ortho_r03_c02.png",
+                      "bbox":  {
+                                   "xmin":  4718094.25060521,
+                                   "ymin":  2251472.89126679,
+                                   "xmax":  4718609.25060521,
+                                   "ymax":  2251952.89126679
+                               },
+                      "bboxSR":  9377,
+                      "imageSR":  9377,
+                      "width":  3914,
+                      "height":  3648,
+                      "resolutionMetersPerPixel":  0.13157894736842105,
+                      "format":  "png32",
+                      "url":  "https://www.medellin.gov.co/servidormapas/rest/services/ServiciosImagen/Ortofoto_Medellin_2024/ImageServer/exportImage?bbox=4718094.25060521,2251472.89126679,4718609.25060521,2251952.89126679\u0026bboxSR=9377\u0026imageSR=9377\u0026size=3914,3648\u0026format=png32\u0026f=image"
+                  },
+                  {
+                      "index":  11,
+                      "row":  3,
+                      "column":  3,
+                      "filename":  "ortho_r03_c03.png",
+                      "bbox":  {
+                                   "xmin":  4718609.25060521,
+                                   "ymin":  2251472.89126679,
+                                   "xmax":  4719124.25060521,
+                                   "ymax":  2251952.89126679
+                               },
+                      "bboxSR":  9377,
+                      "imageSR":  9377,
+                      "width":  3914,
+                      "height":  3648,
+                      "resolutionMetersPerPixel":  0.13157894736842105,
+                      "format":  "png32",
+                      "url":  "https://www.medellin.gov.co/servidormapas/rest/services/ServiciosImagen/Ortofoto_Medellin_2024/ImageServer/exportImage?bbox=4718609.25060521,2251472.89126679,4719124.25060521,2251952.89126679\u0026bboxSR=9377\u0026imageSR=9377\u0026size=3914,3648\u0026format=png32\u0026f=image"
+                  },
+                  {
+                      "index":  12,
+                      "row":  3,
+                      "column":  4,
+                      "filename":  "ortho_r03_c04.png",
+                      "bbox":  {
+                                   "xmin":  4719124.25060521,
+                                   "ymin":  2251472.89126679,
+                                   "xmax":  4719639.25060521,
+                                   "ymax":  2251952.89126679
+                               },
+                      "bboxSR":  9377,
+                      "imageSR":  9377,
+                      "width":  3914,
+                      "height":  3648,
+                      "resolutionMetersPerPixel":  0.13157894736842105,
+                      "format":  "png32",
+                      "url":  "https://www.medellin.gov.co/servidormapas/rest/services/ServiciosImagen/Ortofoto_Medellin_2024/ImageServer/exportImage?bbox=4719124.25060521,2251472.89126679,4719639.25060521,2251952.89126679\u0026bboxSR=9377\u0026imageSR=9377\u0026size=3914,3648\u0026format=png32\u0026f=image"
+                  }
+              ]
+}
