@@ -24,6 +24,7 @@
       <section class="panel-section">
         <div class="section-heading"><span class="section-icon">▤</span><div><h2>Capas del mapa</h2><p>Controla lo que ves</p></div></div>
         <div class="layer-list" id="layer-list"></div>
+        <section class="local-layers" aria-label="Agregar información local"><h3>Capas temporales</h3><button class="secondary-action" id="add-local-layers" type="button">Agregar capas desde el equipo</button><input id="local-layer-files" type="file" multiple accept=".zip,.geojson,.json,.kml,.kmz,.gpx,.csv,.tif,.tiff" hidden><p id="local-layer-status" class="stats-note" aria-live="polite">Los archivos se procesan solo en este navegador.</p></section>
         <p class="layer-scale-hint">Construcciones: zoom 15–19 · Predios: zoom 16–19</p>
       </section>
 
@@ -62,13 +63,19 @@
         <div class="section-heading"><div><h2 id="inspector-title">Detalle de entidad</h2><p id="inspector-subtitle">Selecciona un predio o construcción</p></div><button id="inspector-close" class="icon-button" type="button" aria-label="Cerrar detalle">×</button></div>
         <div id="inspector-content" class="inspector-content"></div>
         <button id="inspector-zoom" class="secondary-action" type="button">Acercar a entidad</button>
+        <button id="inspector-share" class="secondary-action" type="button">Copiar enlace de consulta</button>
+        <p id="inspector-share-status" class="stats-note" aria-live="polite"></p>
       </section>
 
       <section class="panel-section export-panel" aria-label="Exportar resultados">
         <div class="section-heading"><div><h2>Resultados y salida</h2><p>Usa los filtros activos</p></div></div>
         <button class="secondary-action" id="export-filtered" type="button">Descargar CSV filtrado</button>
+        <button class="secondary-action" id="export-geojson" type="button">Descargar resultados GeoJSON</button>
+        <label class="filter-field">CRS de coordenadas de salida<select id="output-crs"><option value="4326">EPSG:4326 · WGS 84</option><option value="3116">EPSG:3116 · MAGNA-SIRGAS / Bogotá</option><option value="9377">EPSG:9377 · MAGNA-SIRGAS 2018 / Origen-Nacional</option></select></label>
         <button class="secondary-action" id="print-map" type="button">Imprimir composición del mapa</button>
-        <p id="spatial-result" class="stats-note" aria-live="polite">Para consultar construcciones dentro de un polígono, dibújalo y finalízalo.</p>
+        <label class="filter-field">Relación de consulta espacial<select id="spatial-relation"><option value="intersects">Interseca el polígono</option><option value="within">Está completamente dentro</option></select></label>
+        <p id="spatial-result" class="stats-note" aria-live="polite">Dibuja un polígono para consultar predios y construcciones.</p>
+        <button class="secondary-action" id="open-spatial-results" type="button" disabled>Ver registros de la consulta</button>
       </section>
 
       <section class="panel-section">
@@ -80,6 +87,8 @@
           <button class="tool-button tool-button-muted" id="undo-draw" title="Deshacer el último vértice" disabled><span class="tool-glyph">↶</span><span>Deshacer</span></button>
         </div>
         <div class="draw-hint" id="draw-hint" aria-live="polite">Selecciona una geometría para comenzar.</div>
+        <div class="drawing-history" id="drawing-history" aria-label="Geometrías dibujadas durante esta sesión"><p class="drawing-history-empty">Todavía no hay geometrías dibujadas.</p></div>
+        <div class="drawing-export-row"><label for="drawing-export-format">Exportar dibujos</label><select id="drawing-export-format"><option value="geojson">GeoJSON · WGS 84</option><option value="kml">KML · WGS 84</option><option value="kmz">KMZ · WGS 84</option><option value="xlsx">Excel XLSX · coordenadas</option></select><select id="drawing-export-scope" aria-label="Geometrías a exportar"><option value="all">Todos</option><option value="selected">Solo seleccionados</option></select><button class="secondary-action" id="export-drawings" type="button">Descargar</button></div>
       </section>
 
       <section class="panel-section">
@@ -123,19 +132,22 @@
             <button id="attribute-table-close" type="button" aria-label="Cerrar tabla">Cerrar</button>
           </div>
         </header>
+        <div class="attribute-table-tools attribute-table-selection-tools"><span id="attribute-selection-count" aria-live="polite">0 seleccionados</span><button id="attribute-export-selection" type="button" disabled>Exportar selección CSV</button></div>
         <div class="attribute-table-scroll"><table><thead id="attribute-table-head"></thead><tbody id="attribute-table-body"></tbody></table></div>
         <footer class="attribute-table-footer"><span>Selecciona una fila para acercar el mapa</span><div><button id="attribute-table-prev" type="button" aria-label="Página anterior">‹</button><span id="attribute-table-page">0 de 0</span><button id="attribute-table-next" type="button" aria-label="Página siguiente">›</button></div></footer>
       </section>
       <div class="map-topbar"><div class="location-pill"><span class="location-pulse"></span><span>MANRIQUE, MEDELLÍN</span><span class="location-divider"></span><span class="location-coords">6.28° N&nbsp; 75.59° O</span></div><div class="map-topbar-actions"><a class="map-badge preview-3d-link" href="vista-3d.html" title="Abrir vista previa del terreno en 3D">◈ <span>VISTA 3D · PREVIEW</span></a><div class="map-badge">● <span>MAPA INTERACTIVO</span></div></div></div>
-      <div class="map-status"><div class="coordinate-readout"><span class="status-label">COORDENADAS</span><strong id="coordinates">Mueve el cursor sobre el mapa</strong></div><div class="status-divider"></div><div class="zoom-readout"><span class="status-label">NIVEL DE ZOOM</span><strong id="zoom-level">—</strong></div></div>
+      <div class="map-status"><div class="coordinate-readout"><span class="status-label">COORDENADAS · EPSG:4326</span><strong id="coordinates">Mueve el cursor sobre el mapa</strong><small id="crs-indicator">Mapa EPSG:3857 · Datos fuente EPSG:9377</small></div><div class="status-divider"></div><div class="zoom-readout"><span class="status-label">NIVEL DE ZOOM</span><strong id="zoom-level">—</strong></div></div>
     </section>
+    <dialog id="csv-import-dialog" class="metadata-dialog"><form id="csv-import-form" method="dialog"><button class="dialog-close" value="cancel" aria-label="Cerrar">×</button><h2>Importar CSV de coordenadas</h2><p>Elige las columnas X/Y y el CRS de origen. Las coordenadas se transformarán a WGS 84 para mostrarlas.</p><label class="filter-field">Columna X / longitud<select id="csv-x-column" required></select></label><label class="filter-field">Columna Y / latitud<select id="csv-y-column" required></select></label><label class="filter-field">Sistema de coordenadas<select id="csv-crs"><option value="4326">EPSG:4326 · WGS 84</option><option value="3116">EPSG:3116 · MAGNA-SIRGAS / Bogotá</option><option value="9377">EPSG:9377 · MAGNA-SIRGAS 2018 / Origen-Nacional</option></select></label><div class="csv-import-actions"><button value="cancel" type="submit">Cancelar</button><button id="csv-import-confirm" value="import" type="submit">Importar puntos</button></div></form></dialog>
   </main>
 
    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="https://unpkg.com/@tomickigrzegorz/leaflet-rotate@0.3.0/dist/leaflet-rotate.umd.min.js"></script>
     <script src="https://unpkg.com/esri-leaflet@3.0.19/dist/esri-leaflet.js"></script>
-    <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
-    <script src="https://calvinmetcalf.github.io/leaflet.shapefile/leaflet.shpfile.js"></script>
+    <script src="https://unpkg.com/proj4@2.22.0/dist/proj4.js"></script>
+    <script src="https://unpkg.com/jszip@3.10.2/dist/jszip.min.js"></script>
+    <script src="https://unpkg.com/shpjs@6.2.0/dist/shp.js"></script>
     <script src="https://unpkg.com/georaster@1.6.0/dist/georaster.browser.bundle.min.js"></script>
     <script src="https://unpkg.com/georaster-layer-for-leaflet@3.10.0/dist/georaster-layer-for-leaflet.min.js"></script>
     <script src="scripts.js"></script>
