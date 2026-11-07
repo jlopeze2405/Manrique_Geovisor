@@ -38,6 +38,9 @@ const CONFIG = Object.freeze({
 const container = document.getElementById("threeContainer");
 const statusEl = document.getElementById("load-state");
 const diagnosticsEl = document.getElementById("terrain-diagnostics");
+const compassNeedle = document.getElementById("compass-needle");
+const compassCardinals = document.getElementById("compass-cardinals");
+const northInView = new THREE.Vector3();
 let renderer;
 let rendererBackend = "";
 let controls;
@@ -1053,6 +1056,9 @@ async function loadTexture(loader, tile) {
 
 async function initializeScene() {
   const scene = new THREE.Scene();
+  // Convert projected east/north/up into Three.js east/up/south axes: north is -Z.
+  scene.scale.set(1, 1, -1);
+  scene.userData.axisConvention = "EPSG:9377; east +X, north -Z, up +Y";
   scene.background = new THREE.Color(0xdceaf1);
   const width = container.clientWidth;
   const height = container.clientHeight;
@@ -1140,6 +1146,14 @@ async function initializeScene() {
   const animate = () => {
     animationFrame = requestAnimationFrame(animate);
     controls.update();
+    camera.updateMatrixWorld();
+    const north = northInView.set(0, 0, -1).transformDirection(camera.matrixWorldInverse);
+    const northAngle = Math.atan2(north.x, north.y) * 180 / Math.PI;
+    if (compassNeedle) compassNeedle.style.transform = "translate(-50%,-50%) rotate(" + northAngle + "deg)";
+    if (compassCardinals) {
+      compassCardinals.style.transform = "rotate(" + northAngle + "deg)";
+      for (const label of compassCardinals.children) label.style.transform = "rotate(" + (-northAngle) + "deg)";
+    }
     renderer.render(scene, camera);
   };
   animate();
@@ -1273,7 +1287,7 @@ async function main() {
   const center = new THREE.Vector3(0, (analysis.maximum - baseElevation) * CONFIG.verticalScale * 0.35, 0);
   controls.target.copy(center);
   const span = Math.max(extent.xmax - extent.xmin, extent.ymax - extent.ymin);
-  camera.position.set(span * 0.7, span * 1.2, -span * 0.7);
+  camera.position.set(0, span * 1.2, span * 1.2);
   camera.lookAt(center);
   camera.updateProjectionMatrix();
   controls.update();
