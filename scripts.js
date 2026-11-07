@@ -80,7 +80,7 @@
     var content = metadataDialog.querySelector('.metadata-content'); content.textContent = '';
     var records = [
       [/Amenaza por movimiento/i, '2026-11-01', 'EPSG:9377'], [/Barrios de Manrique/i, '2026-10-07', 'EPSG:9377'],
-      [/Buffer/i, '2026-09-30', 'EPSG:4326'], [/Comunas/i, '2026-09-18', 'EPSG:9377'],
+      [/Buffer/i, '2026-05-17', 'EPSG:9377'], [/Comunas/i, '2026-09-18', 'EPSG:9377'],
       [/Construcciones/i, '2026-10-21', 'EPSG:9377'], [/Predios/i, '2026-11-01', 'EPSG:9377'], [/Riesgo/i, '2026-11-01', 'EPSG:9377']
     ];
     var record = records.find(function (item) { return item[0].test(name); });
