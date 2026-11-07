@@ -358,38 +358,6 @@
     return group;
   }
 
-  function loadDemExtentReference() {
-    var name = 'Límite de referencia del DEM';
-    var group = L.layerGroup();
-    overlays[name] = group;
-    addLayerControl(name, group, '#ffc247', false, false);
-    fetch('data/Raster/ZONA_ESTUDIO.tfw').then(function (response) {
-      if (!response.ok) throw new Error('HTTP ' + response.status);
-      return response.text();
-    }).then(function (text) {
-      if (!window.proj4) throw new Error('No está disponible la transformación EPSG:9377.');
-      proj4.defs('EPSG:9377', '+proj=tmerc +lat_0=4 +lon_0=-73 +k=0.9992 +x_0=5000000 +y_0=2000000 +ellps=GRS80 +units=m +no_defs +type=crs');
-      var world = text.trim().split(/\s+/).map(Number);
-      if (world.length !== 6 || !world.every(Number.isFinite) || Math.abs(world[1]) > 1e-9 || Math.abs(world[2]) > 1e-9) throw new Error('El TFW no describe una cuadrícula norte-arriba válida.');
-      var pixelX = world[0], centerX = world[4], centerY = world[5];
-      var bounds = { xmin: centerX - pixelX / 2, xmax: centerX + (205 - 0.5) * pixelX, ymax: centerY - world[3] / 2, ymin: centerY + (144 - 0.5) * world[3] };
-      var ring = [];
-      var corners = [[bounds.xmin, bounds.ymax], [bounds.xmax, bounds.ymax], [bounds.xmax, bounds.ymin], [bounds.xmin, bounds.ymin], [bounds.xmin, bounds.ymax]];
-      corners.forEach(function (a, edge) {
-        var b = corners[(edge + 1) % corners.length];
-        for (var step = 0; step < 12; step++) {
-          var t = step / 12;
-          ring.push(proj4('EPSG:9377', 'EPSG:4326', [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]));
-        }
-      });
-      ring.push(ring[0]);
-      var feature = { type: 'Feature', properties: { nombre: name }, geometry: { type: 'Polygon', coordinates: [ring] } };
-      group.addLayer(L.geoJSON(feature, { style: { color: '#b87900', weight: 3, opacity: 1, fill: false, dashArray: '7 5' } }));
-      var row = Array.from(layerList.querySelectorAll('.layer-item')).find(function (item) { return item.querySelector('label').textContent === name; });
-      if (row) row.querySelector('.layer-state').textContent = 'OFF';
-    }).catch(function (error) { console.warn('No se pudo dibujar la extensión de referencia del DEM:', error); });
-  }
-
   var ortofoto2024 = L.esri.imageMapLayer({
     url: 'https://www.medellin.gov.co/servidormapas/rest/services/ServiciosImagen/Ortofoto_Medellin_2024/ImageServer',
     renderingRule: { rasterFunction: 'Ortofoto_2024_3' },
@@ -1035,6 +1003,7 @@
         return all;
       }, []);
       var isBoundary = path.indexOf('shp_barrios_y_veredas_mr') !== -1 || path.indexOf('Barrios_Manrique') !== -1;
+      var isStudyBuffer = /Bff_Uva/i.test(path);
       var isParcelLayer = /Predios_Influencia/i.test(path);
       var isConstructionLayer = /Construcciones_Area_Estudio/i.test(path);
       var riskKind = path.indexOf('Amenaza_Mov_Masa') !== -1 ? 'threat' : (/RIESGO_MOV_MASA|Riesgo_Mov_Masa|Construcciones_Area_Estudio|Predios_Influencia/i.test(path) ? 'landslide' : null);
@@ -1058,12 +1027,12 @@
           var featureColor = riskKind ? appearance.color : color;
           return {
             pane: featurePane,
-            color: isBoundary ? '#e8edf2' : featureColor,
-            weight: isBoundary ? 1.25 : (isRiskZoneLayer || isConstructionLayer ? appearance.weight : (isParcelLayer ? 1.15 : 1.5)),
+            color: isBoundary ? '#e8edf2' : (isStudyBuffer ? '#b87900' : featureColor),
+            weight: isStudyBuffer ? 3 : (isBoundary ? 1.25 : (isRiskZoneLayer || isConstructionLayer ? appearance.weight : (isParcelLayer ? 1.15 : 1.5))),
             opacity: 0.95,
             fillColor: featureColor,
-            fillOpacity: isRiskZoneLayer ? appearance.fillOpacity : (isParcelLayer ? 0.08 : (isConstructionLayer ? Math.min(0.22, appearance.fillOpacity + 0.06) : 0)),
-            dashArray: appearance.dashArray,
+            fillOpacity: isStudyBuffer ? 0.08 : (isRiskZoneLayer ? appearance.fillOpacity : (isParcelLayer ? 0.08 : (isConstructionLayer ? Math.min(0.22, appearance.fillOpacity + 0.06) : 0))),
+            dashArray: isStudyBuffer ? '7 4' : appearance.dashArray,
             className: isBoundary ? 'boundary-feature' : undefined
           };
         },
@@ -1148,13 +1117,13 @@
 
   // Capas vectoriales incluidas en data; quedan disponibles desde el panel.
   loadShapefileOverlay('data/recorte/Amenaza_Mov_Masa', 'Amenaza por movimiento en masa', '#f72585');
+  loadShapefileOverlay('data/Buffer_Area_Estudio/Bff_Uva', 'Buffer del área de estudio', '#ffc247');
   loadShapefileOverlay('data/Barrios_Manrique/Barrios_Manrique', 'Barrios de Manrique', '#06d6a0');
   loadShapefileOverlay('data/Comunas_Corregimientos/Comunas_Corregimientos_Med', 'Comunas y corregimientos', '#00b4d8');
   loadShapefileOverlay('data/Curva_Nivel/Curva_nivel_10x10_10', 'Curvas de nivel · 10 m', '#ffb703');
   loadShapefileOverlay('data/Construcciones_Area_Estudio/Construcciones_Area_Estudio', 'Construcciones del área de estudio', '#e76f51');
   loadShapefileOverlay('data/Predios/Predios_Influencia', 'Predios de la zona de influencia', '#9b5de5');
   loadShapefileOverlay('data/RIESGO_MOV_MASA/RIESGO_MOV_MASA', 'Riesgo por movimiento en masa', '#4361ee');
-  loadDemExtentReference();
   // Los GeoTIFF se conservan como insumos analíticos del escenario 3D;
   // no son capas vectoriales del panel Catastro y territorio.
   function updateActionButtons() {

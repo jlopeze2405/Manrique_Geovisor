@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata xml:lang="es"><Esri><CreaDate>20260517</CreaDate><CreaTime>18473300</CreaTime><ArcGISFormat>1.0</ArcGISFormat><SyncOnce>TRUE</SyncOnce><DataProperties><lineage><Process ToolSource="d:\arcgis\pro\Resources\ArcToolbox\toolboxes\GeoAnalytics Desktop Tools.tbx\CreateBuffers" Date="20260517" Time="184733">CreateBuffers PREDIO_INTER D:\PROYECTO\BUFFER_UVA\BUFFER_UVA_PRED_INTER\Bff_Uva.shp GEODESIC DISTANCE # "270 Meters" # NONE # # #</Process></lineage></DataProperties></Esri></metadata>

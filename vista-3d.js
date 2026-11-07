@@ -24,6 +24,9 @@ const CONFIG = Object.freeze({
   threatAttributesUrl: "data/recorte/Amenaza_Mov_Masa.dbf",
   threatEncodingUrl: "data/recorte/Amenaza_Mov_Masa.CPG",
   threatProjectionUrl: "data/recorte/Amenaza_Mov_Masa.prj",
+  bufferUrl: "data/Buffer_Area_Estudio/Bff_Uva.shp",
+  bufferIndexUrl: "data/Buffer_Area_Estudio/Bff_Uva.shx",
+  bufferProjectionUrl: "data/Buffer_Area_Estudio/Bff_Uva.prj",
   estimatedHeightPerFloor: 2.1,
   terrainSkirtDepthMeters: 80,
   manifestUrl: "data/Raster/ortho_tiles_download/tiles.json",
@@ -404,7 +407,7 @@ function addPolygonOverlay(scene, source, categoryValues, kind, values, mask, wi
   const positions = [], colors = [], indices = [], outlines = [], outlineColors = [], counts = {};
   for (const feature of source.features) {
     const symbol = categoryValues ? (kind === "risk" ? riskSymbol(categoryValues.values[feature.id - 1]) : threatSymbol(categoryValues.values[feature.id - 1])) : null;
-    const color = symbol ? new THREE.Color(symbol.hex) : null;
+    const color = symbol ? new THREE.Color(symbol.hex) : (kind === "buffer" ? new THREE.Color(0xf5b335) : null);
     if (symbol) counts[symbol.key] = (counts[symbol.key] || 0) + 1;
     for (const part of buildingPolygonParts(feature)) {
       const points = [part.shell, ...part.holes].flat();
@@ -413,7 +416,7 @@ function addPolygonOverlay(scene, source, categoryValues, kind, values, mask, wi
       const triangles = THREE.ShapeUtils.triangulateShape(part.shell.map(p => new THREE.Vector2(p.x,p.north)), part.holes.map(r => r.map(p => new THREE.Vector2(p.x,p.north))));
       const vertexOffset = positions.length / 3;
       for (let index = 0; index < points.length; index++) {
-        const point = points[index], y = (ground[index] - baseElevation) * CONFIG.verticalScale + (kind === "risk" ? 0.82 : 0.96);
+        const point = points[index], y = (ground[index] - baseElevation) * CONFIG.verticalScale + (kind === "risk" ? 0.82 : (kind === "buffer" ? 0.65 : 0.96));
         positions.push(point.x-originX,y,point.north-originNorth);
         colors.push(color ? color.r : 0.45,color ? color.g : 0.5,color ? color.b : 0.55);
       }
@@ -421,7 +424,7 @@ function addPolygonOverlay(scene, source, categoryValues, kind, values, mask, wi
       let ringIndex = 0;
       for (const ring of [part.shell, ...part.holes]) {
         for (let i=0;i<ring.length;i++) {
-          const a=ring[i], b=ring[(i+1)%ring.length], lift=kind === "risk" ? 0.9 : 1.04;
+          const a=ring[i], b=ring[(i+1)%ring.length], lift=kind === "risk" ? 0.9 : (kind === "buffer" ? 0.78 : 1.04);
           outlines.push(a.x-originX,(ground[ringIndex+i]-baseElevation)*CONFIG.verticalScale+lift,a.north-originNorth,
             b.x-originX,(ground[ringIndex+(i+1)%ring.length]-baseElevation)*CONFIG.verticalScale+lift,b.north-originNorth);
           for (let vertex=0; vertex<2; vertex++) outlineColors.push(color ? color.r : 0.45,color ? color.g : 0.5,color ? color.b : 0.55);
@@ -433,11 +436,11 @@ function addPolygonOverlay(scene, source, categoryValues, kind, values, mask, wi
   const layer = new THREE.Group(); layer.name = kind + "_polygon_layer";
   if (positions.length) {
     const geometry = new THREE.BufferGeometry(); geometry.setAttribute("position",new THREE.Float32BufferAttribute(positions,3)); geometry.setAttribute("color",new THREE.Float32BufferAttribute(colors,3)); geometry.setIndex(indices); geometry.computeBoundingSphere();
-    const mesh = new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide,transparent:true,opacity:kind === "risk" ? 0.42 : 0.2,depthWrite:false,depthTest:true,toneMapped:false,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1}));
+    const mesh = new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide,transparent:true,opacity:kind === "risk" ? 0.42 : (kind === "buffer" ? 0.12 : 0.2),depthWrite:false,depthTest:true,toneMapped:false,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1}));
     mesh.name = kind + "_fills"; layer.add(mesh);
   }
   if (outlines.length) { const geometry=new THREE.BufferGeometry(); geometry.setAttribute("position",new THREE.Float32BufferAttribute(outlines,3)); geometry.setAttribute("color",new THREE.Float32BufferAttribute(outlineColors,3)); geometry.computeBoundingSphere(); layer.add(new THREE.LineSegments(geometry,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:1,depthTest:true,toneMapped:false}))); }
-  layer.userData={featureCount:source.features.length,sourceRecordCount:source.recordCount,categoryCounts:counts,vertexCount:positions.length/3,triangleCount:indices.length/3,drawCalls:(positions.length?1:0)+(outlines.length?1:0),source:kind === "risk" ? CONFIG.riskUrl : kind === "threat" ? CONFIG.threatUrl : CONFIG.parcelsUrl,crs:"EPSG:9377",dbfField:categoryValues && categoryValues.fieldName};
+  layer.userData={featureCount:source.features.length,sourceRecordCount:source.recordCount,categoryCounts:counts,vertexCount:positions.length/3,triangleCount:indices.length/3,drawCalls:(positions.length?1:0)+(outlines.length?1:0),source:kind === "risk" ? CONFIG.riskUrl : kind === "threat" ? CONFIG.threatUrl : (kind === "buffer" ? CONFIG.bufferUrl : CONFIG.parcelsUrl),crs:"EPSG:9377",dbfField:categoryValues && categoryValues.fieldName};
   scene.add(layer); return layer;
 }
 
@@ -734,31 +737,6 @@ function createTerrainSkirt(values, mask, width, height, extent, originX, origin
   return skirt;
 }
 
-function createStudyExtentOutline(values, mask, width, height, extent, originX, originNorth, baseElevation) {
-  const corners = [{ x: extent.xmin, north: extent.ymax }, { x: extent.xmax, north: extent.ymax }, { x: extent.xmax, north: extent.ymin }, { x: extent.xmin, north: extent.ymin }];
-  const positions = [];
-  for (let edge = 0; edge < corners.length; edge++) {
-    const a = corners[edge], b = corners[(edge + 1) % corners.length];
-    const steps = Math.ceil(Math.hypot(b.x - a.x, b.north - a.north) / Math.min(extent.pixelX, extent.pixelY));
-    let previous = null;
-    for (let step = 0; step <= steps; step++) {
-      const t = step / steps, x = a.x + (b.x - a.x) * t, north = a.north + (b.north - a.north) * t;
-      const elevation = sampleRenderedSurfaceElevation(x, north, values, mask, width, height, extent);
-      if (elevation === null) { previous = null; continue; }
-      const current = [x - originX, (elevation - baseElevation) * CONFIG.verticalScale + 1.25, north - originNorth];
-      if (previous) positions.push(...previous, ...current);
-      previous = current;
-    }
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geometry.computeBoundingSphere();
-  const outline = new THREE.Group();
-  outline.name = "study_area_dem_reference_outline";
-  outline.add(new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: 0xffc247, transparent: true, opacity: 1, depthTest: true, toneMapped: false })));
-  outline.userData = { source: "DEM valid extent (reference only)", vertexCount: positions.length / 3, crs: "EPSG:9377" };
-  return outline;
-}
 function enableLayerToggle(id, object) {
   const input = document.getElementById(id);
   if (!input) return;
@@ -1142,7 +1120,7 @@ async function main() {
     throw new Error("La GPU admite texturas de hasta " + maxTextureSize + " px; se requieren al menos 3914 px.");
   }
   setStatus("Leyendo manifiesto y georreferencia del DEM…");
-  const [manifest, world, tiff, buildingSource, buildingAttributes, parcelSource, riskSource, riskAttributes, threatSource, threatAttributes] = await Promise.all([
+  const [manifest, world, tiff, buildingSource, buildingAttributes, parcelSource, riskSource, riskAttributes, threatSource, threatAttributes, bufferSource] = await Promise.all([
     loadJson(CONFIG.manifestUrl).catch(error => { throw new Error("Fallo al cargar el manifiesto de ortofotos: " + error.message); }),
     loadWorldFile(CONFIG.worldFileUrl).catch(error => { throw new Error("Fallo al cargar la georreferencia del DEM: " + error.message); }),
     loadDem(CONFIG.demUrl).catch(error => { throw new Error("Fallo al cargar el DEM " + CONFIG.demUrl + ": " + (error && error.message ? error.message : error)); }),
@@ -1152,7 +1130,8 @@ async function main() {
     loadBuildingFootprints(CONFIG.riskUrl, CONFIG.riskIndexUrl, CONFIG.riskProjectionUrl).catch(error => { throw new Error("Fallo al cargar geometrías de riesgo: " + error.message); }),
     loadCategoryAttributes(CONFIG.riskAttributesUrl, CONFIG.riskEncodingUrl, "riesgo").catch(error => { throw new Error("Fallo al cargar categorías de riesgo: " + error.message); }),
     loadBuildingFootprints(CONFIG.threatUrl, CONFIG.threatIndexUrl, CONFIG.threatProjectionUrl).catch(error => { throw new Error("Fallo al cargar geometrías de amenaza: " + error.message); }),
-    loadCategoryAttributes(CONFIG.threatAttributesUrl, CONFIG.threatEncodingUrl, "grado_amen").catch(error => { throw new Error("Fallo al cargar categorías de amenaza: " + error.message); })
+    loadCategoryAttributes(CONFIG.threatAttributesUrl, CONFIG.threatEncodingUrl, "grado_amen").catch(error => { throw new Error("Fallo al cargar categorías de amenaza: " + error.message); }),
+    loadBuildingFootprints(CONFIG.bufferUrl, CONFIG.bufferIndexUrl, CONFIG.bufferProjectionUrl).catch(error => { throw new Error("Fallo al cargar el buffer del area de estudio: " + error.message); }),
   ]);
   if (buildingSource.recordCount !== 3308 || buildingSource.features.length !== 3308 || buildingAttributes.recordCount !== buildingSource.recordCount) {
     throw new Error("SHP/SHPX/DBF no tienen los mismos 3.308 registros activos: SHP " + buildingSource.recordCount + ", geometrías " + buildingSource.features.length + ", DBF " + buildingAttributes.recordCount + ".");
@@ -1169,6 +1148,7 @@ async function main() {
   if (buildingAttributes.estimatedCount !== 3268 || buildingAttributes.zeroCount !== 40) {
     throw new Error("La auditoría DBF encontró " + buildingAttributes.estimatedCount + " filas con pisos y " + buildingAttributes.zeroCount + " filas sin pisos; se esperaban 3.268 y 40.");
   }
+  if (bufferSource.recordCount !== 1 || bufferSource.features.length !== 1) throw new Error("Bff_Uva debe contener un poligono de buffer.");
   const image = await tiff.getImage();
   const width = image.getWidth();
   const height = image.getHeight();
@@ -1236,8 +1216,7 @@ async function main() {
   const terrainSkirt = createTerrainSkirt(elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation, CONFIG.terrainSkirtDepthMeters, extent);
   terrainLayer.add(terrainSkirt);
   scene.add(terrainLayer);
-  const studyBoundary = createStudyExtentOutline(elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
-  scene.add(studyBoundary);
+  const bufferLayer = addPolygonOverlay(scene, bufferSource, null, "buffer", elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
   const extrusionSample = validateExtrusionSample(buildingSource, elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
   const buildingLayer = addBuildingFootprints(scene, buildingSource, elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
   const estimatedBuildingLayer = addEstimatedBuildingVolumes(scene, buildingSource, elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
@@ -1245,7 +1224,7 @@ async function main() {
   const riskLayer = addPolygonOverlay(scene, riskSource, riskAttributes, "risk", elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
   const threatLayer = addPolygonOverlay(scene, threatSource, threatAttributes, "threat", elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
   enableLayerToggle("layer-terrain", terrainLayer);
-  enableLayerToggle("layer-study-boundary", studyBoundary);
+  enableLayerToggle("layer-buffer", bufferLayer);
   enableLayerToggle("layer-buildings", buildingLayer);
   enableLayerToggle("layer-building-volumes", estimatedBuildingLayer);
   enableLayerToggle("layer-parcels", parcelLayer);
@@ -1266,7 +1245,8 @@ async function main() {
   const coveragePercent = textureCoverage.coverageRatio * 100;
   const uncoveredNorth = Math.max(0, extent.ymax - textureCoverage.imageExtent.ymax);
   setStatus("Terreno listo: " + buildingLayer.userData.featureCount.toLocaleString("es-CO") + " huellas, " + estimatedBuildingLayer.userData.featureCount.toLocaleString("es-CO") + " volúmenes estimados y " + estimatedBuildingLayer.userData.flatFootprintCount + " huellas sin volumen.", uncoveredNorth > CONFIG.extentToleranceMeters ? "warning" : "info");
-  diagnosticsEl.innerHTML += "<br><strong>Superficie</strong><br>" + renderedTriangles.toLocaleString("es-CO") + " triángulos en 12 parches; " + dropped.toLocaleString("es-CO") + " cuadrículas omitidas por NoData. Zócalo perimetral uniforme de " + terrainSkirt.userData.depthMeters + " m bajo la elevación mínima; " + terrainSkirt.userData.wallSegments.toLocaleString("es-CO") + " segmentos. Ortofoto cubre " + formatNumber(coveragePercent, 2) + "% del bbox DEM; la superficie fuera de los tiles se omite. El contorno de referencia representa la extensión del DEM; no sustituye el shapefile del buffer ausente. Origen local: E " + formatNumber(originX, 2) + " / N " + formatNumber(originNorth, 2) + " m. Factor vertical " + CONFIG.verticalScale.toFixed(1) + ".<br><strong>Construcciones</strong><br>" + buildingLayer.userData.featureCount.toLocaleString("es-CO") + " de " + buildingLayer.userData.sourceFeatureCount.toLocaleString("es-CO") + " registros, " + buildingLayer.userData.polygonCount.toLocaleString("es-CO") + " partes poligonales y " + buildingLayer.userData.holeCount.toLocaleString("es-CO") + " huecos. " + buildingLayer.userData.failedPolygons.toLocaleString("es-CO") + " polígonos omitidos por geometría o elevación incompleta. Huellas en gris rojizo con borde oscuro; cotas tomadas del DEM y desplazamiento visual de 0,25–0,55 m.<br><strong>Memoria estimada de texturas</strong><br>" + formatNumber(byteEstimate / (1024 ** 2), 0) + " MiB decodificadas; hasta " + formatNumber(gpuEstimate / (1024 ** 2), 0) + " MiB de GPU con mipmaps. El valor real depende del navegador y la GPU.";
+  diagnosticsEl.innerHTML += "<br><strong>Superficie</strong><br>" + renderedTriangles.toLocaleString("es-CO") + " triángulos en 12 parches; " + dropped.toLocaleString("es-CO") + " cuadrículas omitidas por NoData. Zócalo perimetral uniforme de " + terrainSkirt.userData.depthMeters + " m bajo la elevación mínima; " + terrainSkirt.userData.wallSegments.toLocaleString("es-CO") + " segmentos. Ortofoto cubre " + formatNumber(coveragePercent, 2) + "% del bbox DEM; la superficie fuera de los tiles se omite. Buffer geodésico de 270 m cargado y proyectado sobre la superficie del DEM. Origen local: E " + formatNumber(originX, 2) + " / N " + formatNumber(originNorth, 2) + " m. Factor vertical " + CONFIG.verticalScale.toFixed(1) + ".<br><strong>Construcciones</strong><br>" + buildingLayer.userData.featureCount.toLocaleString("es-CO") + " de " + buildingLayer.userData.sourceFeatureCount.toLocaleString("es-CO") + " registros, " + buildingLayer.userData.polygonCount.toLocaleString("es-CO") + " partes poligonales y " + buildingLayer.userData.holeCount.toLocaleString("es-CO") + " huecos. " + buildingLayer.userData.failedPolygons.toLocaleString("es-CO") + " polígonos omitidos por geometría o elevación incompleta. Huellas en gris rojizo con borde oscuro; cotas tomadas del DEM y desplazamiento visual de 0,25–0,55 m.<br><strong>Memoria estimada de texturas</strong><br>" + formatNumber(byteEstimate / (1024 ** 2), 0) + " MiB decodificadas; hasta " + formatNumber(gpuEstimate / (1024 ** 2), 0) + " MiB de GPU con mipmaps. El valor real depende del navegador y la GPU.";
+  const estimateNote = document.querySelector(".estimate-note"); if (estimateNote) estimateNote.textContent = "Buffer de 270 m alrededor del area de influencia de la UVA La Armonia. Alturas estimadas: 2,10 m por piso; no son mediciones verificadas.";
   diagnosticsEl.innerHTML += "<br><strong>Volúmenes estimados</strong><br>" + estimatedBuildingLayer.userData.featureCount.toLocaleString("es-CO") + " volúmenes, " + estimatedBuildingLayer.userData.triangleCount.toLocaleString("es-CO") + " triángulos y " + estimatedBuildingLayer.userData.vertexCount.toLocaleString("es-CO") + " vértices en " + estimatedBuildingLayer.userData.drawCalls + " llamadas de dibujo. Geometría: " + formatNumber(estimatedBuildingLayer.userData.geometryBytes / (1024 ** 2), 1) + " MiB; preparación: " + formatNumber(estimatedBuildingLayer.userData.buildMilliseconds, 0) + " ms. Prueba previa: " + extrusionSample.count + " construcciones con multipartes, huecos y pendiente. Alturas derivadas de numero_pis × 2,10; no son mediciones verificadas.";
   window.__terrain3d = { scene, camera, controls, renderer, textureCount: textures.size, validElevationCount: analysis.validCount, nodataCount: analysis.missingCount, nodataComponents: analysis.components, renderedTriangles, patchCount: tiles.length, terrainSkirt, buildingLayer, estimatedBuildingLayer, parcelLayer, riskLayer, threatLayer, buildingRecordCount: buildingSource.recordCount, buildingAttributeCount: buildingAttributes.recordCount, parcelRecordCount: parcelSource.recordCount, riskRecordCount: riskSource.recordCount, threatRecordCount: threatSource.recordCount, extrusionSample, verticalScale: CONFIG.verticalScale };
 }
