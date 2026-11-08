@@ -1154,6 +1154,7 @@ async function initializeScene() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, CONFIG.maxPixelRatio));
   renderer.setSize(width, height);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.localClippingEnabled = true;
   renderer.toneMapping = THREE.NoToneMapping;
   renderer.toneMappingExposure = 1.1;
   container.replaceChildren(renderer.domElement);
