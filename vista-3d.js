@@ -795,6 +795,9 @@ function setupNavigationButtons(camera, controls) {
   document.getElementById("nav-zoom-in")?.addEventListener("click", () => zoom(0.78));
   document.getElementById("nav-zoom-out")?.addEventListener("click", () => zoom(1.28));
   document.getElementById("nav-reset")?.addEventListener("click", reset);
+  document.getElementById("touch-zoom-in")?.addEventListener("click", () => zoom(0.78));
+  document.getElementById("touch-zoom-out")?.addEventListener("click", () => zoom(1.28));
+  document.getElementById("touch-reset")?.addEventListener("click", reset);
   window.addEventListener("keydown", event => { if (event.key === "Home" && !event.altKey && !event.ctrlKey && !event.metaKey) reset(); });
 }
 
@@ -1116,6 +1119,8 @@ async function initializeScene() {
   controls.dampingFactor = 0.09;
   controls.enableRotate = true;
   controls.enablePan = true;
+  controls.enableZoom = true;
+  controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
   controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
   controls.rotateSpeed = 0.8;
   controls.zoomSpeed = 1;
