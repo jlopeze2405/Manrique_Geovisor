@@ -381,8 +381,10 @@
     var group = L.layerGroup();
     overlays[name] = group;
     addLayerControl(name, group, color, initiallyVisible, Boolean(isBase));
+    var controlInput = Array.from(layerList.querySelectorAll('.layer-item')).find(function (item) { return item.querySelector('label').textContent === name; });
+    var shouldBeVisible = sharedViewRequested ? Boolean(controlInput && controlInput.querySelector('input').checked) : initiallyVisible;
     if (isBase) baseLayers.push(group);
-    if (initiallyVisible) group.addTo(map);
+    if (shouldBeVisible) group.addTo(map);
 
     fetch(path).then(function (response) {
       if (!response.ok) throw new Error('HTTP ' + response.status);
@@ -421,7 +423,7 @@
         }
       });
       group.addLayer(raster);
-      if (isBase && initiallyVisible) {
+      if (isBase && shouldBeVisible) {
         baseLayers.forEach(function (baseLayer) { if (baseLayer !== group && map.hasLayer(baseLayer)) map.removeLayer(baseLayer); });
         group.addTo(map);
       }
@@ -429,7 +431,7 @@
         return item.querySelector('label').textContent === name;
       });
       if (layerRow) layerRow.querySelector('.layer-state').textContent = layerRow.querySelector('input').checked ? 'ON' : 'OFF';
-      if (initiallyVisible && map.hasLayer(group) && !userChangedView) {
+      if (shouldBeVisible && map.hasLayer(group) && !userChangedView) {
         map.fitBounds(options.viewBounds || raster.getBounds(), { padding: [28, 28], maxZoom: 17 });
       }
     }).catch(function (error) {
@@ -2116,9 +2118,9 @@
     var visibleNames = Array.from(layerList.querySelectorAll('.layer-control-entry')).filter(function (entry) {
       var checkbox = entry.querySelector('input[type="checkbox"]');
       return checkbox && checkbox.checked;
-    }).map(function (entry) { return entry.querySelector('.layer-item label').textContent; });
+    }).map(function (entry) { return entry.querySelector('.layer-item label').textContent; }).filter(function (name) { return name.indexOf('[Temporal] ') !== 0; });
     if (visibleNames.length) shareUrl.searchParams.set('capas', visibleNames.join('|'));
-    try { await navigator.clipboard.writeText(shareUrl.href); document.getElementById('share-view-status').textContent = 'Enlace de vista copiado con encuadre, orientación, capas y filtros.'; }
+    try { await navigator.clipboard.writeText(shareUrl.href); document.getElementById('share-view-status').textContent = 'Enlace copiado con encuadre, orientación, capas permanentes y filtros. Las capas temporales y dibujos de esta sesión no se incluyen.'; }
     catch (error) { document.getElementById('share-view-status').textContent = 'No se pudo copiar automáticamente. Copia este enlace desde la barra del navegador: ' + shareUrl.href; }
   });
   document.getElementById('clear-drawings').addEventListener('click', function () {
