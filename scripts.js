@@ -15,6 +15,18 @@
   var map = L.map('map', { zoomControl: false, rotate: true, bearing: 0, rotateControl: false, dragRotate: true, shiftKeyRotate: true, touchRotate: true, doubleClickZoom: true });
   map.fitBounds(manriqueImageBounds, { padding: [30, 30], maxZoom: 13, animate: false });
   initialCenter = map.getCenter(); initialZoom = map.getZoom();
+  var sharedViewParams = new URLSearchParams(window.location.search);
+  var sharedLayerNames = new Set((sharedViewParams.get('capas') || '').split('|').filter(Boolean));
+  var sharedViewRequested = sharedViewParams.get('vista') === '1';
+  if (sharedViewRequested) {
+    var sharedLat = Number(sharedViewParams.get('lat'));
+    var sharedLng = Number(sharedViewParams.get('lng'));
+    var sharedZoom = Number(sharedViewParams.get('z'));
+    if (Number.isFinite(sharedLat) && Math.abs(sharedLat) <= 90 && Number.isFinite(sharedLng) && Math.abs(sharedLng) <= 180 && Number.isFinite(sharedZoom)) {
+      map.setView([sharedLat, sharedLng], Math.max(3, Math.min(19, sharedZoom)), { animate: false });
+      userChangedView = true;
+    }
+  }
   map.createPane('riskPane');
   map.getPane('riskPane').style.zIndex = 350;
   map.createPane('parcelPane');
@@ -255,6 +267,8 @@
     input.type = base ? 'radio' : 'checkbox';
     input.name = base ? 'base-layer' : 'overlay-' + name;
     input.checked = checked;
+    if (sharedViewRequested && base && (sharedViewParams.get('base') === name)) input.checked = true;
+    if (sharedViewRequested && !base) input.checked = sharedLayerNames.has(name);
     input.id = 'layer-control-' + layerControlIndex++;
     var label = document.createElement('label');
     label.htmlFor = input.id;

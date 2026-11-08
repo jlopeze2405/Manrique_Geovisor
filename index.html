@@ -21,6 +21,8 @@
         </div>
       </header>
 
+      <details class="quick-guide panel-section"><summary>Guía rápida · cómo consultar</summary><ol><li>Activa capas de riesgo o catastro en el panel.</li><li>Filtra por categoría, barrio o identificador.</li><li>Selecciona una entidad para revisar sus atributos.</li><li>Comparte la vista o descarga los resultados.</li></ol></details>
+
       <section class="panel-section">
         <div class="section-heading"><span class="section-icon">▤</span><div><h2>Capas del mapa</h2><p>Controla lo que ves</p></div></div>
         <div class="layer-list" id="layer-list"></div>
@@ -56,7 +58,7 @@
         <div id="landuse-distribution" class="distribution-list" aria-live="polite"></div>
         <h3 class="distribution-title">Entidades por barrio</h3>
         <div id="neighborhood-distribution" class="distribution-list" aria-live="polite"></div>
-        <p class="stats-note">El porcentaje se calcula por intersección geométrica con polígonos de riesgo y categorías registradas.</p>
+        <p class="stats-note">El porcentaje cuenta construcciones que intersectan geométricamente las zonas clasificadas como riesgo. Es una superposición cartográfica; no representa una evaluación predial ni sustituye un estudio técnico.</p>
       </section>
 
       <section class="panel-section inspector-panel" id="feature-inspector" aria-label="Detalle de entidad seleccionada" hidden>
@@ -105,6 +107,7 @@
         <div class="section-heading"><span class="section-icon">◉</span><div><h2>Navegación</h2><p>Vista y orientación</p></div></div>
         <div class="button-row draw-finish-row"><button class="action-button" id="finish-draw" disabled>Finalizar dibujo</button><button class="icon-button" id="cancel-draw" title="Cancelar dibujo" aria-label="Cancelar dibujo" disabled>×</button></div>
         <div class="navigation-row"><div class="zoom-control"><button id="zoom-in" title="Acercar" aria-label="Acercar">+</button><button id="zoom-out" title="Alejar" aria-label="Alejar">−</button></div><button id="reset-view" class="nav-action"><span>⌂</span>Vista inicial</button></div>
+        <button class="secondary-action" id="share-view" type="button">Compartir vista actual</button><p id="share-view-status" class="stats-note" aria-live="polite"></p>
         <div class="rotation-row"><span>Orientación</span><div class="rotation-control"><button id="rotate-left" title="Girar a la izquierda" aria-label="Girar a la izquierda">↶</button><span id="bearing-label">N · 0°</span><button id="rotate-right" title="Girar a la derecha" aria-label="Girar a la derecha">↷</button></div></div>
         <button class="clear-button" id="clear-drawings">Borrar geometrías dibujadas</button>
       </section>
