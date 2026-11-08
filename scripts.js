@@ -499,16 +499,21 @@
     return group;
   }
 
-  var ortofoto2024 = L.esri.imageMapLayer({
-    url: 'https://www.medellin.gov.co/servidormapas/rest/services/ServiciosImagen/Ortofoto_Medellin_2024/ImageServer',
-    renderingRule: { rasterFunction: 'Ortofoto_2024_3' },
-    format: 'jpgpng',
-    attribution: 'Ortofoto Medellín 2024 · Alcaldía de Medellín'
+  var ortofotoMedellin = L.tileLayer('https://www.medellin.gov.co/servidormapas/rest/services/ServiciosCiudad/IMAGEN_WEBM_2024/MapServer/tile/{z}/{y}/{x}', {
+    minZoom: 0,
+    maxZoom: 19,
+    maxNativeZoom: 19,
+    tileSize: 256,
+    updateWhenIdle: true,
+    updateWhenZooming: false,
+    keepBuffer: 2,
+    detectRetina: false,
+    attribution: 'Ortofoto Medellín 2025 · Alcaldía de Medellín (teselas precalculadas)'
   });
-  baseLayers.push(ortofoto2024);
-  addLayerControl('Ortofoto Medellín 2024', ortofoto2024, '#2f855a', true, true);
-  baseLayers.forEach(function (baseLayer) { if (baseLayer !== ortofoto2024 && map.hasLayer(baseLayer)) map.removeLayer(baseLayer); });
-  ortofoto2024.addTo(map);
+  baseLayers.push(ortofotoMedellin);
+  addLayerControl('Ortofoto Medellín 2025 (carga optimizada)', ortofotoMedellin, '#2f855a', true, true);
+  baseLayers.forEach(function (baseLayer) { if (baseLayer !== ortofotoMedellin && map.hasLayer(baseLayer)) map.removeLayer(baseLayer); });
+  ortofotoMedellin.addTo(map);
 
   var uvaIcon = L.divIcon({
     className: 'uva-div-icon',
