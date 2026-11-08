@@ -224,9 +224,18 @@
 
   function applyOpacityToLayerTree(layer, value) {
     if (!layer) return;
-    if (typeof layer.setOpacity === 'function') layer.setOpacity(value);
-    if (layer._path) layer._path.style.filter = 'opacity(' + value + ')';
-    if (typeof layer.eachLayer === 'function') layer.eachLayer(function (child) { applyOpacityToLayerTree(child, value); });
+    if (typeof layer.eachLayer === 'function') {
+      layer.eachLayer(function (child) { applyOpacityToLayerTree(child, value); });
+      return;
+    }
+    if (typeof layer.setOpacity === 'function') {
+      layer.setOpacity(value);
+      return;
+    }
+    if (layer._path) {
+      layer._path.style.opacity = String(value);
+      layer._path.style.filter = '';
+    }
   }
 
   function applyThemeStyle(layer, color, weight, restore) {
@@ -369,13 +378,15 @@
       var opacityWrap = document.createElement('label'); opacityWrap.className = 'layer-opacity';
       opacityWrap.appendChild(document.createTextNode('Opacidad'));
       var opacity = document.createElement('input'); opacity.type = 'range'; opacity.min = '20'; opacity.max = '100'; opacity.value = '100'; opacity.setAttribute('aria-label', 'Opacidad de ' + name);
+      var opacityValue = document.createElement('output'); opacityValue.textContent = '100%'; opacityValue.setAttribute('aria-hidden', 'true');
       row._opacityInput = opacity;
       opacity.addEventListener('input', function () {
         var value = Number(opacity.value) / 100;
         layer._uiOpacity = value;
+        opacityValue.textContent = opacity.value + '%';
         applyOpacityToLayerTree(layer, value);
       });
-      opacityWrap.appendChild(opacity); entry.appendChild(opacityWrap);
+      opacityWrap.append(opacity, opacityValue); entry.appendChild(opacityWrap);
       var styleWrap = document.createElement('div'); styleWrap.className = 'layer-style';
       var colorInput = document.createElement('input'); colorInput.type = 'color'; colorInput.value = color; colorInput.setAttribute('aria-label', 'Color de ' + name);
       var weightInput = document.createElement('input'); weightInput.type = 'range'; weightInput.min = '0.5'; weightInput.max = '6'; weightInput.step = '0.5'; weightInput.value = '1.5'; weightInput.setAttribute('aria-label', 'Grosor de ' + name);
@@ -447,6 +458,7 @@
         }
       });
       group.addLayer(raster);
+      if (group._uiOpacity != null) applyOpacityToLayerTree(raster, group._uiOpacity);
       if (isBase && shouldBeVisible) {
         baseLayers.forEach(function (baseLayer) { if (baseLayer !== group && map.hasLayer(baseLayer)) map.removeLayer(baseLayer); });
         group.addTo(map);
@@ -1507,6 +1519,7 @@
       }
     });
     group.addLayer(geoLayer); group.featureData = features;
+    if (group._uiOpacity != null) applyOpacityToLayerTree(geoLayer, group._uiOpacity);
     var row = Array.from(layerList.querySelectorAll('.layer-item')).find(function (item) { return item.querySelector('label').textContent === label; });
     if (row) row.querySelector('.layer-state').textContent = 'ON';
     if (row) addTemporaryDeleteButton(row, label);
@@ -1612,7 +1625,7 @@
       if (![4326, 3857].includes(Number(georaster.projection))) throw new Error('Este GeoTIFF declara EPSG:' + georaster.projection + '. El renderizador actual solo puede colocar rásteres EPSG:4326 o EPSG:3857; no se mostrará con una ubicación potencialmente incorrecta.');
       var rasterName = '[Temporal] ' + file.name; var rasterGroup = L.layerGroup(); rasterGroup._sourcePath = file.name; rasterGroup._temporary = true; rasterGroup._sourceCrs = 'EPSG:' + georaster.projection;
       overlays[rasterName] = rasterGroup; addLayerControl(rasterName, rasterGroup, localLayerColors[localLayerColorIndex++ % localLayerColors.length], true, false);
-      var localRaster = new GeoRasterLayer({ georaster: georaster, resolution: 256, opacity: 1 }); rasterGroup.addLayer(localRaster); rasterGroup.addTo(map);
+      var localRaster = new GeoRasterLayer({ georaster: georaster, resolution: 256, opacity: 1 }); rasterGroup.addLayer(localRaster); if (rasterGroup._uiOpacity != null) applyOpacityToLayerTree(localRaster, rasterGroup._uiOpacity); rasterGroup.addTo(map);
       var rasterRow = Array.from(layerList.querySelectorAll('.layer-item')).find(function (item) { return item.querySelector('label').textContent === rasterName; }); if (rasterRow) rasterRow.querySelector('.layer-state').textContent = 'ON';
       if (rasterRow) addTemporaryDeleteButton(rasterRow, rasterName);
       return { count: 1, message: 'GeoTIFF cargado · EPSG:' + georaster.projection + ' · resolución de visualización limitada a 256 px por tesela.' };
