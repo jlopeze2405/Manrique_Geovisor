@@ -1022,7 +1022,7 @@ function reportNoData(result, width, height, pixelX, pixelY) {
   }
   const broadRows = rowRanges.filter(item => item.count >= Math.max(10, width * 0.1));
   const broadSummary = broadRows.length ? broadRows.length + " filas tienen al menos " + formatNumber(Math.max(10, width * 0.1), 0) + " celdas NoData; la mayor ocupa " + result.largest.size + " celdas (" + formatNumber(largestArea, 0) + " m²), filas " + (result.largest.minRow + 1) + "–" + (result.largest.maxRow + 1) + ", columnas " + (result.largest.minColumn + 1) + "–" + (result.largest.maxColumn + 1) + "." : "No se detectaron franjas NoData extensas por fila.";
-  diagnosticsEl.innerHTML = "<strong>Diagnóstico DEM</strong><br>" + result.validCount.toLocaleString("es-CO") + " / " + total.toLocaleString("es-CO") + " celdas con elevación (" + formatNumber(result.minimum, 1) + "–" + formatNumber(result.maximum, 1) + " m).<br>" + result.missingCount.toLocaleString("es-CO") + " celdas NoData (" + formatNumber(percent, 1) + "%), en " + result.components + " zona(s) conectada(s). " + broadSummary + "<br>Las áreas NoData se dejan sin superficie.";
+  diagnosticsEl.innerHTML = "<strong>Diagnóstico DEM</strong><br>" + result.validCount.toLocaleString("es-CO") + " / " + total.toLocaleString("es-CO") + " celdas con elevación (" + formatNumber(result.minimum, 1) + "–" + formatNumber(result.maximum, 1) + " m).<br>" + result.missingCount.toLocaleString("es-CO") + " celdas NoData (" + formatNumber(percent, 1) + "%), en " + result.components + " zona(s) conectada(s). " + broadSummary + "<br>Las áreas NoData se completan solo para dibujar; los datos originales permanecen intactos.";
 }
 
 function sampleAt(values, mask, width, height, row, column) {
@@ -1328,6 +1328,7 @@ async function main() {
   const analysis = analyzeNoData(elevations, nodata, width, height);
   if (analysis.validCount === 0) throw new Error("El DEM no contiene valores de elevación válidos.");
   reportNoData(analysis, width, height, extent.pixelX, extent.pixelY);
+  const displaySurface = createDisplaySurface(elevations, analysis.mask, width, height);
   setStatus("DEM leído: " + width + " × " + height + " celdas. Analizando NoData antes de crear la superficie…", analysis.missingCount ? "warning" : "info");
   const worldCrs = Math.abs(extent.pixelX - 10) < 1e-6 && Math.abs(extent.pixelY - 10) < 1e-6;
   if (!worldCrs) throw new Error("La resolución del DEM no es 10 × 10 m según el TFW.");
@@ -1368,7 +1369,7 @@ async function main() {
   const terrainLayer = new THREE.Group();
   terrainLayer.name = "terrain_and_orthophoto_layer";
   for (const tile of tiles) {
-    const result = buildTileGeometry(tile, elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation, focusBounds);
+    const result = buildTileGeometry(tile, displaySurface.values, displaySurface.mask, width, height, extent, originX, originNorth, baseElevation, focusBounds);
     renderedTriangles += result.triangles;
     const material = new THREE.MeshStandardMaterial({ map: textures.get(tile.filename), roughness: 1, metalness: 0, side: THREE.DoubleSide });
     const mesh = new THREE.Mesh(result.geometry, material);
@@ -1377,7 +1378,7 @@ async function main() {
     terrainLayer.add(mesh);
     materials.push(material);
   }
-  const terrainSkirt = createTerrainSkirt(elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation, CONFIG.terrainSkirtDepthMeters, focusBounds);
+  const terrainSkirt = createTerrainSkirt(displaySurface.values, displaySurface.mask, width, height, extent, originX, originNorth, baseElevation, CONFIG.terrainSkirtDepthMeters, focusBounds);
   terrainLayer.add(terrainSkirt);
   scene.add(terrainLayer);
   const bufferLayer = addPolygonOverlay(scene, bufferSource, null, "buffer", elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
@@ -1398,7 +1399,7 @@ async function main() {
   if (!renderedTriangles) throw new Error("No se generaron triángulos válidos; revise la máscara NoData del DEM.");
   const focusCenterX = (focusBounds.xmin + focusBounds.xmax) / 2;
   const focusCenterNorth = (focusBounds.ymin + focusBounds.ymax) / 2;
-  const focusGround = sampleRenderedSurfaceElevation(focusCenterX, focusCenterNorth, elevations, analysis.mask, width, height, extent);
+  const focusGround = sampleRenderedSurfaceElevation(focusCenterX, focusCenterNorth, displaySurface.values, displaySurface.mask, width, height, extent);
   const center = new THREE.Vector3(focusCenterX - originX, ((focusGround === null ? analysis.maximum : focusGround) - baseElevation) * CONFIG.verticalScale * 0.35, originNorth - focusCenterNorth);
   controls.target.copy(center);
   const span = Math.max(focusBounds.xmax - focusBounds.xmin, focusBounds.ymax - focusBounds.ymin);
