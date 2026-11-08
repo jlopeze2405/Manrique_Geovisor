@@ -320,6 +320,10 @@
         if (groupToggle && groupInputs.length) groupToggle.textContent = groupInputs.some(function (item) { return !item.checked; }) ? 'Activar grupo' : 'Apagar grupo';
       }
     });
+    if (sharedViewRequested && input.checked) {
+      if (base) { baseLayers.forEach(function (baseLayer) { if (map.hasLayer(baseLayer)) map.removeLayer(baseLayer); }); layer.addTo(map); }
+      else layer.addTo(map);
+    }
     if (extentButton) row.append(input, swatch, label, state, extentButton, row._infoButton);
     else row.append(input, swatch, label, state);
     var parent = layerGroupContainer(name, base);
@@ -958,7 +962,8 @@
     landuseFilter.textContent = '';
     var all = document.createElement('option'); all.value = 'all'; all.textContent = 'Todos los usos disponibles'; landuseFilter.appendChild(all);
     values.forEach(function (value) { var option = document.createElement('option'); option.value = value; option.textContent = value; landuseFilter.appendChild(option); });
-    if (values.indexOf(current) !== -1) landuseFilter.value = current;
+    if (sharedViewRequested && sharedViewParams.has('uso') && values.indexOf(sharedViewParams.get('uso')) !== -1) landuseFilter.value = sharedViewParams.get('uso');
+    else if (values.indexOf(current) !== -1) landuseFilter.value = current;
   }
 
   function applyDataFilters() {
@@ -1035,6 +1040,11 @@
   if (neighborhoodFilter) neighborhoodFilter.addEventListener('change', applyDataFilters);
   if (landuseFilter) landuseFilter.addEventListener('change', applyDataFilters);
   if (entityFilter) entityFilter.addEventListener('input', applyDataFilters);
+  if (sharedViewRequested) {
+    if (riskFilter && riskFilter.querySelector('option[value="' + CSS.escape(sharedViewParams.get('riesgo') || '') + '"]')) riskFilter.value = sharedViewParams.get('riesgo');
+    if (neighborhoodFilter && neighborhoodFilter.querySelector('option[value="' + CSS.escape(sharedViewParams.get('barrio') || '') + '"]')) neighborhoodFilter.value = sharedViewParams.get('barrio');
+    if (entityFilter) entityFilter.value = sharedViewParams.get('id') || '';
+  }
 
   function riskAppearance(properties, kind) {
     var value = normalizedText(getCategoryValue(properties, kind));
