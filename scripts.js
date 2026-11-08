@@ -74,6 +74,27 @@
   var vertexMarkers = [];
   var bearing = 0;
   var layerList = document.getElementById('layer-list');
+  var activeLayerLegend = document.getElementById('active-layer-legend');
+  function renderActiveLayerLegend() {
+    if (!activeLayerLegend) return;
+    activeLayerLegend.textContent = '';
+    var entries = Array.from(layerList.querySelectorAll('.layer-control-entry')).filter(function (entry) {
+      var input = entry.querySelector('input');
+      return input && input.checked;
+    });
+    if (!entries.length) {
+      var empty = document.createElement('p'); empty.textContent = 'No hay capas visibles.'; activeLayerLegend.appendChild(empty); return;
+    }
+    entries.forEach(function (entry) {
+      var row = document.createElement('div'); row.className = 'map-layer-legend-item';
+      var swatch = entry.querySelector('.layer-swatch');
+      var symbol = document.createElement('i');
+      symbol.style.setProperty('--layer-color', swatch ? getComputedStyle(swatch).getPropertyValue('--swatch').trim() || '#78879a' : '#1976d2');
+      var label = entry.querySelector('.layer-item label');
+      var text = document.createElement('span'); text.textContent = label ? label.textContent : 'Capa';
+      row.append(symbol, text); activeLayerLegend.appendChild(row);
+    });
+  }
   var finishButton = document.getElementById('finish-draw');
   var cancelButton = document.getElementById('cancel-draw');
   var undoButton = document.getElementById('undo-draw');
