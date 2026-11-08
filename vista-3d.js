@@ -1256,6 +1256,7 @@ async function main() {
   const height = image.getHeight();
   if (width !== 205 || height !== 144) throw new Error("El DEM ZONA_ESTUDIO tiene dimensiones inesperadas: " + width + " × " + height + ".");
   const extent = getDemExtent(width, height, world);
+  const focusBounds = focusBoundsFromFeatures(bufferSource, CONFIG.focusMarginMeters, extent);
   const textureCoverage = validateManifest(manifest, extent);
   const geoKeys = image.getGeoKeys ? image.getGeoKeys() : {};
   const projectedCrs = geoKeys.ProjectedCSTypeGeoKey;
@@ -1309,7 +1310,7 @@ async function main() {
   const terrainLayer = new THREE.Group();
   terrainLayer.name = "terrain_and_orthophoto_layer";
   for (const tile of tiles) {
-    const result = buildTileGeometry(tile, elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
+    const result = buildTileGeometry(tile, elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation, focusBounds);
     renderedTriangles += result.triangles;
     const material = new THREE.MeshStandardMaterial({ map: textures.get(tile.filename), roughness: 1, metalness: 0, side: THREE.DoubleSide });
     const mesh = new THREE.Mesh(result.geometry, material);
@@ -1318,7 +1319,7 @@ async function main() {
     terrainLayer.add(mesh);
     materials.push(material);
   }
-  const terrainSkirt = createTerrainSkirt(elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation, CONFIG.terrainSkirtDepthMeters, textureCoverage.intersection);
+  const terrainSkirt = createTerrainSkirt(elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation, CONFIG.terrainSkirtDepthMeters, focusBounds);
   terrainLayer.add(terrainSkirt);
   scene.add(terrainLayer);
   const bufferLayer = addPolygonOverlay(scene, bufferSource, null, "buffer", elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
@@ -1328,6 +1329,7 @@ async function main() {
   const parcelLayer = addParcelBoundaries(scene, parcelSource, elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
   const riskLayer = addPolygonOverlay(scene, riskSource, riskAttributes, "risk", elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
   const threatLayer = addPolygonOverlay(scene, threatSource, threatAttributes, "threat", elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
+  const focusClipPlanes = applySceneFocusClip(scene, focusBounds, originX, originNorth);
   enableLayerToggle("layer-terrain", terrainLayer);
   enableLayerToggle("layer-buffer", bufferLayer);
   enableLayerToggle("layer-buildings", buildingLayer);
@@ -1336,10 +1338,13 @@ async function main() {
   enableLayerToggle("layer-risk", riskLayer);
   enableLayerToggle("layer-threat", threatLayer);
   if (!renderedTriangles) throw new Error("No se generaron triángulos válidos; revise la máscara NoData del DEM.");
-  const center = new THREE.Vector3(0, (analysis.maximum - baseElevation) * CONFIG.verticalScale * 0.35, 0);
+  const focusCenterX = (focusBounds.xmin + focusBounds.xmax) / 2;
+  const focusCenterNorth = (focusBounds.ymin + focusBounds.ymax) / 2;
+  const focusGround = sampleRenderedSurfaceElevation(focusCenterX, focusCenterNorth, elevations, analysis.mask, width, height, extent);
+  const center = new THREE.Vector3(focusCenterX - originX, ((focusGround === null ? analysis.maximum : focusGround) - baseElevation) * CONFIG.verticalScale * 0.35, originNorth - focusCenterNorth);
   controls.target.copy(center);
-  const span = Math.max(extent.xmax - extent.xmin, extent.ymax - extent.ymin);
-  camera.position.set(0, span * 1.2, span * 1.2);
+  const span = Math.max(focusBounds.xmax - focusBounds.xmin, focusBounds.ymax - focusBounds.ymin);
+  camera.position.set(center.x, center.y + span * 1.2, center.z + span * 1.2);
   camera.lookAt(center);
   camera.updateProjectionMatrix();
   controls.update();
@@ -1350,10 +1355,10 @@ async function main() {
   const coveragePercent = textureCoverage.coverageRatio * 100;
   const uncoveredNorth = Math.max(0, extent.ymax - textureCoverage.imageExtent.ymax);
   setStatus("Terreno listo: " + buildingLayer.userData.featureCount.toLocaleString("es-CO") + " huellas, " + estimatedBuildingLayer.userData.featureCount.toLocaleString("es-CO") + " volúmenes estimados y " + estimatedBuildingLayer.userData.flatFootprintCount + " huellas sin volumen.", uncoveredNorth > CONFIG.extentToleranceMeters ? "warning" : "info");
-  diagnosticsEl.innerHTML += "<br><strong>Superficie</strong><br>" + renderedTriangles.toLocaleString("es-CO") + " triángulos en 12 parches; " + dropped.toLocaleString("es-CO") + " cuadrículas omitidas por NoData. Zócalo perimetral uniforme de " + terrainSkirt.userData.depthMeters + " m bajo la elevación mínima; " + terrainSkirt.userData.wallSegments.toLocaleString("es-CO") + " segmentos. Ortofoto cubre " + formatNumber(coveragePercent, 2) + "% del bbox DEM; la superficie fuera de los tiles se omite. Buffer geodésico de 270 m cargado y proyectado sobre la superficie del DEM. Origen local: E " + formatNumber(originX, 2) + " / N " + formatNumber(originNorth, 2) + " m. Factor vertical " + CONFIG.verticalScale.toFixed(1) + ".<br><strong>Construcciones</strong><br>" + buildingLayer.userData.featureCount.toLocaleString("es-CO") + " de " + buildingLayer.userData.sourceFeatureCount.toLocaleString("es-CO") + " registros, " + buildingLayer.userData.polygonCount.toLocaleString("es-CO") + " partes poligonales y " + buildingLayer.userData.holeCount.toLocaleString("es-CO") + " huecos. " + buildingLayer.userData.failedPolygons.toLocaleString("es-CO") + " polígonos omitidos por geometría o elevación incompleta. Huellas en gris rojizo con borde oscuro; cotas tomadas del DEM y desplazamiento visual de 0,25–0,55 m.<br><strong>Memoria estimada de texturas</strong><br>" + formatNumber(byteEstimate / (1024 ** 2), 0) + " MiB decodificadas; hasta " + formatNumber(gpuEstimate / (1024 ** 2), 0) + " MiB de GPU con mipmaps. El valor real depende del navegador y la GPU.";
+  diagnosticsEl.innerHTML += "<br><strong>Escenario enfocado</strong><br>Buffer de estudio con " + CONFIG.focusMarginMeters + " m de entorno visible. Extensión: " + formatNumber(focusBounds.xmax - focusBounds.xmin, 0) + " × " + formatNumber(focusBounds.ymax - focusBounds.ymin, 0) + " m. El recorte solo afecta la visualización; los archivos y validaciones usan sus extensiones completas.<br><strong>Superficie</strong><br>" + renderedTriangles.toLocaleString("es-CO") + " triángulos en los parches visibles; " + dropped.toLocaleString("es-CO") + " cuadrículas omitidas por NoData. Zócalo perimetral uniforme de " + terrainSkirt.userData.depthMeters + " m bajo la elevación mínima; " + terrainSkirt.userData.wallSegments.toLocaleString("es-CO") + " segmentos. Ortofoto cubre " + formatNumber(coveragePercent, 2) + "% del bbox DEM. Buffer geodésico de 270 m proyectado sobre la superficie del DEM. Origen local: E " + formatNumber(originX, 2) + " / N " + formatNumber(originNorth, 2) + " m. Factor vertical " + CONFIG.verticalScale.toFixed(1) + ".<br><strong>Construcciones</strong><br>" + buildingLayer.userData.featureCount.toLocaleString("es-CO") + " de " + buildingLayer.userData.sourceFeatureCount.toLocaleString("es-CO") + " registros, " + buildingLayer.userData.polygonCount.toLocaleString("es-CO") + " partes poligonales y " + buildingLayer.userData.holeCount.toLocaleString("es-CO") + " huecos. " + buildingLayer.userData.failedPolygons.toLocaleString("es-CO") + " polígonos omitidos por geometría o elevación incompleta. Huellas en gris rojizo con borde oscuro; cotas tomadas del DEM y desplazamiento visual de 0,25–0,55 m.<br><strong>Memoria estimada de texturas</strong><br>" + formatNumber(byteEstimate / (1024 ** 2), 0) + " MiB decodificadas; hasta " + formatNumber(gpuEstimate / (1024 ** 2), 0) + " MiB de GPU con mipmaps. El valor real depende del navegador y la GPU.";
   const estimateNote = document.querySelector(".estimate-note"); if (estimateNote) estimateNote.textContent = "Buffer de 270 m alrededor del area de influencia de la UVA La Armonia. Alturas estimadas: 2,10 m por piso; no son mediciones verificadas.";
   diagnosticsEl.innerHTML += "<br><strong>Volúmenes estimados</strong><br>" + estimatedBuildingLayer.userData.featureCount.toLocaleString("es-CO") + " volúmenes, " + estimatedBuildingLayer.userData.triangleCount.toLocaleString("es-CO") + " triángulos y " + estimatedBuildingLayer.userData.vertexCount.toLocaleString("es-CO") + " vértices en " + estimatedBuildingLayer.userData.drawCalls + " llamadas de dibujo. Geometría: " + formatNumber(estimatedBuildingLayer.userData.geometryBytes / (1024 ** 2), 1) + " MiB; preparación: " + formatNumber(estimatedBuildingLayer.userData.buildMilliseconds, 0) + " ms. Prueba previa: " + extrusionSample.count + " construcciones con multipartes, huecos y pendiente. Alturas derivadas de numero_pis × 2,10; no son mediciones verificadas.";
-  window.__terrain3d = { scene, camera, controls, renderer, textureCount: textures.size, validElevationCount: analysis.validCount, nodataCount: analysis.missingCount, nodataComponents: analysis.components, renderedTriangles, patchCount: tiles.length, terrainSkirt, buildingLayer, estimatedBuildingLayer, parcelLayer, riskLayer, threatLayer, buildingRecordCount: buildingSource.recordCount, buildingAttributeCount: buildingAttributes.recordCount, parcelRecordCount: parcelSource.recordCount, riskRecordCount: riskSource.recordCount, threatRecordCount: threatSource.recordCount, extrusionSample, verticalScale: CONFIG.verticalScale };
+  window.__terrain3d = { scene, camera, controls, renderer, textureCount: textures.size, validElevationCount: analysis.validCount, nodataCount: analysis.missingCount, nodataComponents: analysis.components, renderedTriangles, patchCount: tiles.length, focusBounds, focusClipPlanes, terrainSkirt, buildingLayer, estimatedBuildingLayer, parcelLayer, riskLayer, threatLayer, buildingRecordCount: buildingSource.recordCount, buildingAttributeCount: buildingAttributes.recordCount, parcelRecordCount: parcelSource.recordCount, riskRecordCount: riskSource.recordCount, threatRecordCount: threatSource.recordCount, extrusionSample, verticalScale: CONFIG.verticalScale };
 }
 
 main().catch(error => {
