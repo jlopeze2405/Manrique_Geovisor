@@ -246,6 +246,12 @@
     else layer.setStyle({ color: color, fillColor: color, weight: weight });
   }
 
+  function applyLayerWeight(layer, weight) {
+    if (!layer) return;
+    if (typeof layer.eachLayer === 'function') { layer.eachLayer(function (child) { applyLayerWeight(child, weight); }); return; }
+    if (typeof layer.setStyle === 'function') layer.setStyle({ weight: weight });
+  }
+
   function applyLayerStackOrder(section) {
     Array.from(section.querySelectorAll(':scope > .layer-control-entry')).forEach(function (entry, index) {
       var layer = entry._mapLayer;
@@ -290,7 +296,7 @@
     });
   }
   map.on('moveend zoomend', updateFeatureLabels);
-  function addLayerControl(name, layer, color, checked, base) {
+  function addLayerControl(name, layer, color, checked, base, styleEditable) {
     var row = document.createElement('div');
     row.className = 'layer-item';
     var input = document.createElement('input');
@@ -389,9 +395,18 @@
       opacityWrap.append(opacity, opacityValue); entry.appendChild(opacityWrap);
       var styleWrap = document.createElement('div'); styleWrap.className = 'layer-style';
       var colorInput = document.createElement('input'); colorInput.type = 'color'; colorInput.value = color; colorInput.setAttribute('aria-label', 'Color de ' + name);
+      var canChangeColor = styleEditable !== false;
+      colorInput.disabled = !canChangeColor;
+      if (!canChangeColor) colorInput.title = 'Color definido por la categoría de riesgo';
       var weightInput = document.createElement('input'); weightInput.type = 'range'; weightInput.min = '0.5'; weightInput.max = '6'; weightInput.step = '0.5'; weightInput.value = '1.5'; weightInput.setAttribute('aria-label', 'Grosor de ' + name);
       var resetStyle = document.createElement('button'); resetStyle.type = 'button'; resetStyle.textContent = 'Restaurar'; resetStyle.title = 'Restaurar simbología original';
       function changeStyle() {
+        if (!canChangeColor) {
+          entry._customWeight = true;
+          layer._uiWeight = Number(weightInput.value);
+          applyLayerWeight(layer, Number(weightInput.value));
+          return;
+        }
         entry._customStyle = true;
         layer._uiStyle = { color: colorInput.value, weight: Number(weightInput.value) };
         applyThemeStyle(layer, colorInput.value, Number(weightInput.value), false);
@@ -401,7 +416,7 @@
       colorInput.addEventListener('input', changeStyle); weightInput.addEventListener('input', changeStyle);
       resetStyle.addEventListener('click', function (event) {
         event.preventDefault(); event.stopPropagation(); colorInput.value = color; weightInput.value = '1.5';
-        entry._customStyle = false; layer._uiStyle = null; swatch.style.setProperty('--swatch', color); applyThemeStyle(layer, color, 1.5, true);
+        entry._customStyle = false; entry._customWeight = false; layer._uiStyle = null; layer._uiWeight = null; swatch.style.setProperty('--swatch', color); applyThemeStyle(layer, color, 1.5, true);
       });
       styleWrap.append('Simbología ', colorInput, weightInput, resetStyle); entry.appendChild(styleWrap);
       row._colorInput = colorInput; row._weightInput = weightInput;
@@ -1245,7 +1260,8 @@
     overlays[name] = group;
     group._sourcePath = path + '.shp';
     group._sourceCrs = 'EPSG:9377'; group._displayCrs = 'EPSG:4326 · shpjs transforma las geometrías al cargarlas';
-    addLayerControl(name, group, color, false, false);
+    var styleEditable = !/Predios_Influencia|Construcciones_Area_Estudio/i.test(path);
+    addLayerControl(name, group, color, false, false, styleEditable);
     var row = Array.from(layerList.querySelectorAll('.layer-item')).find(function (item) {
       return item.querySelector('label').textContent === name;
     });
@@ -1364,6 +1380,7 @@
       group.featureData = features;
       var controlEntry = row && row.parentElement;
       if (controlEntry && controlEntry._customStyle) applyThemeStyle(layer, row._colorInput.value, Number(row._weightInput.value), false);
+      else if (controlEntry && controlEntry._customWeight) applyLayerWeight(layer, Number(row._weightInput.value));
       if (/Bff_Uva/i.test(path) && !userChangedView) {
         var studyBounds = getLayerBounds(layer);
         if (studyBounds) {
