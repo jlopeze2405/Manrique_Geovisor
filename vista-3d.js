@@ -955,12 +955,14 @@ function analyzeNoData(values, nodata, width, height) {
 // remain untouched for all overlays, measurements, and validation.
 function createDisplaySurface(values, sourceMask, width, height) {
   const displayValues = Float64Array.from(values);
-  const displayMask = new Uint8Array(sourceMask.length);
+  const filledMask = new Uint8Array(sourceMask.length);
   const queue = new Int32Array(sourceMask.length);
+  let missingCount = 0;
   let head = 0;
   let tail = 0;
   for (let index = 0; index < sourceMask.length; index++) {
     if (!sourceMask[index]) queue[tail++] = index;
+    else missingCount++;
   }
   if (!tail) throw new Error("No hay elevaciones válidas para completar visualmente el DEM.");
 
@@ -971,8 +973,8 @@ function createDisplaySurface(values, sourceMask, width, height) {
     const column = current % width;
     const neighbors = [column > 0 ? current - 1 : -1, column + 1 < width ? current + 1 : -1, row > 0 ? current - width : -1, row + 1 < height ? current + width : -1];
     for (const next of neighbors) {
-      if (next >= 0 && sourceMask[next] && !displayMask[next]) {
-        displayMask[next] = 1;
+      if (next >= 0 && sourceMask[next] && !filledMask[next]) {
+        filledMask[next] = 1;
         displayValues[next] = displayValues[current];
         queue[tail++] = next;
       }
@@ -980,7 +982,7 @@ function createDisplaySurface(values, sourceMask, width, height) {
   }
 
   // Smooth only interpolated cells so large NoData patches do not form plateaus.
-  const iterations = Math.min(180, Math.max(24, Math.ceil(Math.sqrt(tail - (sourceMask.length - 0)) * 2)));
+  const iterations = Math.min(180, Math.max(24, Math.ceil(Math.sqrt(missingCount) * 2)));
   let currentValues = displayValues;
   let nextValues = Float64Array.from(displayValues);
   for (let iteration = 0; iteration < iterations; iteration++) {
@@ -999,7 +1001,7 @@ function createDisplaySurface(values, sourceMask, width, height) {
     }
     const swap = currentValues; currentValues = nextValues; nextValues = swap;
   }
-  return { values: currentValues, mask: displayMask, filledCount: tail - (sourceMask.length - sourceMask.reduce((sum, value) => sum + value, 0)) };
+  return { values: currentValues, mask: new Uint8Array(sourceMask.length), filledCount: missingCount };
 }
 
 function reportNoData(result, width, height, pixelX, pixelY) {
