@@ -29,6 +29,7 @@ const CONFIG = Object.freeze({
   bufferProjectionUrl: "data/Buffer_Area_Estudio/Bff_Uva.prj",
   estimatedHeightPerFloor: 2.1,
   terrainSkirtDepthMeters: 80,
+  focusMarginMeters: 180,
   manifestUrl: "data/Raster/ortho_tiles_fast/tiles.json",
   textureFolderUrl: "data/Raster/ortho_tiles_fast/",
   extentToleranceMeters: 0.00001,
@@ -714,6 +715,51 @@ function sampleRenderedSurfaceElevation(x, north, values, mask, width, height, e
     : d * (u + v - 1) + lowerLeft * (1 - u) + b * (1 - v);
 }
 
+function focusBoundsFromFeatures(source, margin, extent) {
+  const bounds = { xmin: Infinity, ymin: Infinity, xmax: -Infinity, ymax: -Infinity };
+  for (const feature of source.features) for (const ring of feature.rings) for (const point of ring) {
+    bounds.xmin = Math.min(bounds.xmin, point.x);
+    bounds.ymin = Math.min(bounds.ymin, point.north);
+    bounds.xmax = Math.max(bounds.xmax, point.x);
+    bounds.ymax = Math.max(bounds.ymax, point.north);
+  }
+  if (![bounds.xmin, bounds.ymin, bounds.xmax, bounds.ymax].every(Number.isFinite)) {
+    throw new Error("No se pudo calcular el encuadre del buffer del área de estudio.");
+  }
+  const focused = {
+    xmin: Math.max(extent.xmin, bounds.xmin - margin),
+    ymin: Math.max(extent.ymin, bounds.ymin - margin),
+    xmax: Math.min(extent.xmax, bounds.xmax + margin),
+    ymax: Math.min(extent.ymax, bounds.ymax + margin)
+  };
+  if (focused.xmin >= focused.xmax || focused.ymin >= focused.ymax) {
+    throw new Error("El buffer de estudio no intersecta la extensión del DEM.");
+  }
+  return focused;
+}
+
+function applySceneFocusClip(scene, bounds, originX, originNorth) {
+  const localXMin = bounds.xmin - originX;
+  const localXMax = bounds.xmax - originX;
+  const localZMin = originNorth - bounds.ymax;
+  const localZMax = originNorth - bounds.ymin;
+  const planes = [
+    new THREE.Plane(new THREE.Vector3(1, 0, 0), -localXMin),
+    new THREE.Plane(new THREE.Vector3(-1, 0, 0), localXMax),
+    new THREE.Plane(new THREE.Vector3(0, 0, 1), -localZMin),
+    new THREE.Plane(new THREE.Vector3(0, 0, -1), localZMax)
+  ];
+  scene.traverse(object => {
+    if (!object.material) return;
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    for (const material of materials) {
+      material.clippingPlanes = planes;
+      material.needsUpdate = true;
+    }
+  });
+  return planes;
+}
+
 function createTerrainSkirt(values, mask, width, height, extent, originX, originNorth, baseElevation, depthMeters = 80, bounds = extent) {
   const gridWidth = width + 2, gridHeight = height + 2;
   const nodes = new Array(gridWidth * gridHeight);
@@ -979,7 +1025,7 @@ function clipToTile(polygon, bbox) {
   return clipped;
 }
 
-function buildTileGeometry(tile, values, mask, width, height, extent, originX, originNorth, baseElevation) {
+function buildTileGeometry(tile, values, mask, width, height, extent, originX, originNorth, baseElevation, focusBounds) {
   const gridWidth = width + 2;
   const gridHeight = height + 2;
   const nodes = new Array(gridWidth * gridHeight);
@@ -1008,7 +1054,8 @@ function buildTileGeometry(tile, values, mask, width, height, extent, originX, o
   };
   let sourceQuads = 0;
   const clipTriangle = triangle => {
-    const polygon = clipToTile(triangle, tile.bbox);
+    const withinFocus = clipToTile(triangle, focusBounds);
+    const polygon = clipToTile(withinFocus, tile.bbox);
     if (polygon.length < 3) return;
     for (let index = 1; index < polygon.length - 1; index++) pushTriangle(polygon[0], polygon[index], polygon[index + 1]);
   };
