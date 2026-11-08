@@ -397,6 +397,8 @@
       var colorInput = document.createElement('input'); colorInput.type = 'color'; colorInput.value = color; colorInput.setAttribute('aria-label', 'Color de ' + name);
       var canChangeColor = styleEditable !== false;
       colorInput.disabled = !canChangeColor;
+      var colorLockNote = document.createElement('small');
+      if (!canChangeColor) colorLockNote.textContent = 'Color por riesgo';
       if (!canChangeColor) colorInput.title = 'Color definido por la categoría de riesgo';
       var weightInput = document.createElement('input'); weightInput.type = 'range'; weightInput.min = '0.5'; weightInput.max = '6'; weightInput.step = '0.5'; weightInput.value = '1.5'; weightInput.setAttribute('aria-label', 'Grosor de ' + name);
       var resetStyle = document.createElement('button'); resetStyle.type = 'button'; resetStyle.textContent = 'Restaurar'; resetStyle.title = 'Restaurar simbología original';
@@ -419,6 +421,7 @@
         entry._customStyle = false; entry._customWeight = false; layer._uiStyle = null; layer._uiWeight = null; swatch.style.setProperty('--swatch', color); applyThemeStyle(layer, color, 1.5, true);
       });
       styleWrap.append('Simbología ', colorInput, weightInput, resetStyle); entry.appendChild(styleWrap);
+      if (!canChangeColor) styleWrap.appendChild(colorLockNote);
       row._colorInput = colorInput; row._weightInput = weightInput;
     }
   }
