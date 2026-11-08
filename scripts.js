@@ -1000,7 +1000,14 @@
     var buildingCount = document.getElementById('building-count');
     if (buildingCount) buildingCount.textContent = buildings.length.toLocaleString('es');
     if (percentNode) percentNode.textContent = !riskZonesReady ? '—' : ((buildings.length ? Math.round(atRisk * 100 / buildings.length) : 0) + '%');
-    if (scopeNode) scopeNode.textContent = selected === 'all' ? 'Área de estudio · filtros vigentes' : 'Barrio: ' + neighborhoodFilter.options[neighborhoodFilter.selectedIndex].textContent;
+    if (scopeNode) {
+      var scopeParts = [];
+      if (selected !== 'all' && neighborhoodFilter) scopeParts.push('barrio: ' + neighborhoodFilter.options[neighborhoodFilter.selectedIndex].textContent);
+      if (riskFilter && riskFilter.value !== 'all') scopeParts.push('riesgo: ' + riskFilter.options[riskFilter.selectedIndex].textContent);
+      if (landuseFilter && landuseFilter.value !== 'all') scopeParts.push('uso: ' + landuseFilter.options[landuseFilter.selectedIndex].textContent);
+      if (entityFilter && entityFilter.value.trim()) scopeParts.push('identificador: ' + entityFilter.value.trim());
+      scopeNode.textContent = scopeParts.length ? 'Filtros activos · ' + scopeParts.join(' · ') : 'Área de estudio · sin filtros';
+    }
     var distribution = document.getElementById('risk-distribution');
     if (distribution) {
       distribution.textContent = '';
