@@ -951,6 +951,57 @@ function analyzeNoData(values, nodata, width, height) {
   return { validCount, missingCount: missing.length - validCount, components, largest, minimum, maximum, mask: missing };
 }
 
+// Fill DEM NoData cells for rendering only. Source elevations and analysis masks
+// remain untouched for all overlays, measurements, and validation.
+function createDisplaySurface(values, sourceMask, width, height) {
+  const displayValues = Float64Array.from(values);
+  const displayMask = new Uint8Array(sourceMask.length);
+  const queue = new Int32Array(sourceMask.length);
+  let head = 0;
+  let tail = 0;
+  for (let index = 0; index < sourceMask.length; index++) {
+    if (!sourceMask[index]) queue[tail++] = index;
+  }
+  if (!tail) throw new Error("No hay elevaciones válidas para completar visualmente el DEM.");
+
+  // Propagate the nearest valid edge elevation into each missing cell.
+  while (head < tail) {
+    const current = queue[head++];
+    const row = Math.floor(current / width);
+    const column = current % width;
+    const neighbors = [column > 0 ? current - 1 : -1, column + 1 < width ? current + 1 : -1, row > 0 ? current - width : -1, row + 1 < height ? current + width : -1];
+    for (const next of neighbors) {
+      if (next >= 0 && sourceMask[next] && !displayMask[next]) {
+        displayMask[next] = 1;
+        displayValues[next] = displayValues[current];
+        queue[tail++] = next;
+      }
+    }
+  }
+
+  // Smooth only interpolated cells so large NoData patches do not form plateaus.
+  const iterations = Math.min(180, Math.max(24, Math.ceil(Math.sqrt(tail - (sourceMask.length - 0)) * 2)));
+  let currentValues = displayValues;
+  let nextValues = Float64Array.from(displayValues);
+  for (let iteration = 0; iteration < iterations; iteration++) {
+    for (let row = 0; row < height; row++) {
+      for (let column = 0; column < width; column++) {
+        const index = row * width + column;
+        if (!sourceMask[index]) continue;
+        let sum = 0;
+        let count = 0;
+        if (column > 0) { sum += currentValues[index - 1]; count++; }
+        if (column + 1 < width) { sum += currentValues[index + 1]; count++; }
+        if (row > 0) { sum += currentValues[index - width]; count++; }
+        if (row + 1 < height) { sum += currentValues[index + width]; count++; }
+        if (count) nextValues[index] = sum / count;
+      }
+    }
+    const swap = currentValues; currentValues = nextValues; nextValues = swap;
+  }
+  return { values: currentValues, mask: displayMask, filledCount: tail - (sourceMask.length - sourceMask.reduce((sum, value) => sum + value, 0)) };
+}
+
 function reportNoData(result, width, height, pixelX, pixelY) {
   const total = width * height;
   const percent = result.missingCount / total * 100;
