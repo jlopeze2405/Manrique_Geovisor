@@ -2121,7 +2121,7 @@
     }).map(function (entry) { return entry.querySelector('.layer-item label').textContent; }).filter(function (name) { return name.indexOf('[Temporal] ') !== 0; });
     if (visibleNames.length) shareUrl.searchParams.set('capas', visibleNames.join('|'));
     try { await navigator.clipboard.writeText(shareUrl.href); document.getElementById('share-view-status').textContent = 'Enlace copiado con encuadre, orientación, capas permanentes y filtros. Las capas temporales y dibujos de esta sesión no se incluyen.'; }
-    catch (error) { document.getElementById('share-view-status').textContent = 'No se pudo copiar automáticamente. Copia este enlace desde la barra del navegador: ' + shareUrl.href; }
+    catch (error) { document.getElementById('share-view-status').textContent = 'No se pudo copiar automáticamente. Mantén pulsado y copia este enlace: ' + shareUrl.href; }
   });
   document.getElementById('clear-drawings').addEventListener('click', function () {
     if ((drawingRecords.length || measurementLayer.getLayers().length) && !window.confirm('¿Borrar todos los dibujos y mediciones de esta sesión?')) return;
