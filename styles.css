@@ -56,8 +56,14 @@ html,body,.map-stage,#map{background:#fff;color:#102a43}
 .quick-guide{margin:10px 14px 0;padding:11px 14px;border:1px solid #d5e2ef;border-radius:9px;background:#f7fafc;color:#173b5e}
 .quick-guide summary{cursor:pointer;font-size:10px;font-weight:800;color:#0b5363}
 .quick-guide ol{margin:10px 0 0;padding-left:19px;color:#486581;font-size:9px;line-height:1.65}
+.map-layer-legend{position:absolute;z-index:465;top:82px;left:18px;width:min(220px,calc(100% - 90px));max-height:calc(100% - 150px);overflow:auto;border:1px solid #c5d7e8;border-radius:9px;background:#fffffff2;color:#173b5e;box-shadow:0 5px 22px #0b2e5918}
+.map-layer-legend summary{padding:9px 11px;cursor:pointer;font-size:10px;font-weight:800;color:#0b5363}
+.map-layer-legend #active-layer-legend{display:grid;gap:6px;padding:0 11px 10px}
+.map-layer-legend #active-layer-legend p{margin:0;color:#627d98;font-size:9px;line-height:1.45}
+.map-layer-legend-item{display:flex;align-items:flex-start;gap:7px;color:#486581;font-size:9px;line-height:1.35}
+.map-layer-legend-item i{width:11px;height:11px;flex:0 0 11px;margin-top:1px;border:1px solid color-mix(in srgb,var(--layer-color) 55%,transparent);border-radius:3px;background:color-mix(in srgb,var(--layer-color) 35%,white)}
 button:focus-visible,a:focus-visible{outline:2px solid #1976d2;outline-offset:2px}
-@media(max-width:620px){.map-navigation button{width:44px;height:44px}.map-navigation{top:58px;right:8px;gap:5px}.quick-guide{margin:8px 10px 0}}
+@media(max-width:620px){.map-navigation button{width:44px;height:44px}.map-navigation{top:58px;right:8px;gap:5px}.map-layer-legend{top:58px;left:8px;width:min(190px,calc(100% - 100px));max-height:calc(100% - 130px)}.map-layer-legend summary{padding:8px}.quick-guide{margin:8px 10px 0}}
 /* Leyenda temática en la esquina superior derecha del mapa. */
 .map-risk-legend{position:absolute;z-index:470;top:82px;right:68px;width:min(230px,calc(100% - 90px));max-height:calc(100% - 110px);overflow:auto;padding:12px 14px;border:1px solid #c5d7e8;border-radius:9px;background:#fffffff2;color:#173b5e;box-shadow:0 5px 22px #0b2e5926;pointer-events:auto}.map-risk-legend[hidden],.map-risk-legend-section[hidden]{display:none}.map-risk-legend h3{margin:0 0 9px;font-size:11px;font-weight:800}.map-risk-legend-section{padding:7px 0;border-top:1px solid #d5e2ef}.map-risk-legend-section h4{margin:0 0 6px;font-size:9px;line-height:1.4}.map-risk-legend-item{display:flex;align-items:center;gap:7px;padding:2px 0;color:#486581;font-size:9px}.map-risk-legend-item i{width:15px;height:0;flex:0 0 15px;border-top:3px solid var(--legend-color)}
 @media(max-width:620px){.map-risk-legend{top:58px;right:54px;width:calc(100% - 100px);max-height:calc(100% - 80px);padding:9px 10px}}

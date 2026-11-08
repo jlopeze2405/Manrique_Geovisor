@@ -341,6 +341,7 @@
         if (groupToggle && groupInputs.length) groupToggle.textContent = groupInputs.some(function (item) { return !item.checked; }) ? 'Activar grupo' : 'Apagar grupo';
       }
     });
+    input.addEventListener('change', renderActiveLayerLegend);
     if (sharedViewRequested && input.checked) {
       if (base) { baseLayers.forEach(function (baseLayer) { if (map.hasLayer(baseLayer)) map.removeLayer(baseLayer); }); layer.addTo(map); }
       else layer.addTo(map);
@@ -363,6 +364,7 @@
     }
     entry.appendChild(row);
     parent.appendChild(entry);
+    renderActiveLayerLegend();
     if (!base) {
       var opacityWrap = document.createElement('label'); opacityWrap.className = 'layer-opacity';
       opacityWrap.appendChild(document.createTextNode('Opacidad'));
@@ -383,6 +385,7 @@
         layer._uiStyle = { color: colorInput.value, weight: Number(weightInput.value) };
         applyThemeStyle(layer, colorInput.value, Number(weightInput.value), false);
         swatch.style.setProperty('--swatch', colorInput.value);
+        renderActiveLayerLegend();
       }
       colorInput.addEventListener('input', changeStyle); weightInput.addEventListener('input', changeStyle);
       resetStyle.addEventListener('click', function (event) {
