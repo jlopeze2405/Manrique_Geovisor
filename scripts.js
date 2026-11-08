@@ -15,6 +15,7 @@
   var map = L.map('map', { zoomControl: false, rotate: true, bearing: 0, rotateControl: false, dragRotate: true, shiftKeyRotate: true, touchRotate: true, doubleClickZoom: true });
   map.fitBounds(manriqueImageBounds, { padding: [30, 30], maxZoom: 13, animate: false });
   initialCenter = map.getCenter(); initialZoom = map.getZoom();
+  var userChangedView = false;
   var sharedViewParams = new URLSearchParams(window.location.search);
   var sharedLayerNames = new Set((sharedViewParams.get('capas') || '').split('|').filter(Boolean));
   var sharedViewRequested = sharedViewParams.get('vista') === '1';
@@ -35,7 +36,6 @@
   map.getPane('constructionPane').style.zIndex = 460;
   map.createPane('landmarkPane');
   map.getPane('landmarkPane').style.zIndex = 640;
-  var userChangedView = false;
   map.on('dragstart zoomstart', function () { userChangedView = true; });
   var imagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
     maxZoom: 19,
@@ -267,7 +267,7 @@
     input.type = base ? 'radio' : 'checkbox';
     input.name = base ? 'base-layer' : 'overlay-' + name;
     input.checked = checked;
-    if (sharedViewRequested && base && (sharedViewParams.get('base') === name)) input.checked = true;
+    if (sharedViewRequested && base) input.checked = sharedViewParams.get('base') === name;
     if (sharedViewRequested && !base) input.checked = sharedLayerNames.has(name);
     input.id = 'layer-control-' + layerControlIndex++;
     var label = document.createElement('label');
@@ -1041,8 +1041,8 @@
   if (landuseFilter) landuseFilter.addEventListener('change', applyDataFilters);
   if (entityFilter) entityFilter.addEventListener('input', applyDataFilters);
   if (sharedViewRequested) {
-    if (riskFilter && riskFilter.querySelector('option[value="' + CSS.escape(sharedViewParams.get('riesgo') || '') + '"]')) riskFilter.value = sharedViewParams.get('riesgo');
-    if (neighborhoodFilter && neighborhoodFilter.querySelector('option[value="' + CSS.escape(sharedViewParams.get('barrio') || '') + '"]')) neighborhoodFilter.value = sharedViewParams.get('barrio');
+    if (riskFilter && Array.from(riskFilter.options).some(function (option) { return option.value === sharedViewParams.get('riesgo'); })) riskFilter.value = sharedViewParams.get('riesgo');
+    if (neighborhoodFilter && Array.from(neighborhoodFilter.options).some(function (option) { return option.value === sharedViewParams.get('barrio'); })) neighborhoodFilter.value = sharedViewParams.get('barrio');
     if (entityFilter) entityFilter.value = sharedViewParams.get('id') || '';
   }
 
@@ -2091,6 +2091,29 @@
     syncBearingIndicator();
   }
   map.on('rotate', syncBearingIndicator);
+  if (sharedViewRequested) setBearing(Number(sharedViewParams.get('n')) || 0);
+  document.getElementById('share-view').addEventListener('click', async function () {
+    var shareUrl = new URL(window.location.href);
+    shareUrl.search = '';
+    shareUrl.searchParams.set('vista', '1');
+    shareUrl.searchParams.set('lat', map.getCenter().lat.toFixed(6));
+    shareUrl.searchParams.set('lng', map.getCenter().lng.toFixed(6));
+    shareUrl.searchParams.set('z', map.getZoom().toFixed(2));
+    shareUrl.searchParams.set('n', String(Math.round(bearing)));
+    if (riskFilter) shareUrl.searchParams.set('riesgo', riskFilter.value);
+    if (neighborhoodFilter) shareUrl.searchParams.set('barrio', neighborhoodFilter.value);
+    if (landuseFilter && landuseFilter.value !== 'all') shareUrl.searchParams.set('uso', landuseFilter.value);
+    if (entityFilter && entityFilter.value) shareUrl.searchParams.set('id', entityFilter.value);
+    var checkedBase = layerList.querySelector('input[name="base-layer"]:checked');
+    if (checkedBase) shareUrl.searchParams.set('base', checkedBase.nextElementSibling.nextElementSibling.textContent);
+    var visibleNames = Array.from(layerList.querySelectorAll('.layer-control-entry')).filter(function (entry) {
+      var checkbox = entry.querySelector('input[type="checkbox"]');
+      return checkbox && checkbox.checked;
+    }).map(function (entry) { return entry.querySelector('.layer-item label').textContent; });
+    if (visibleNames.length) shareUrl.searchParams.set('capas', visibleNames.join('|'));
+    try { await navigator.clipboard.writeText(shareUrl.href); document.getElementById('share-view-status').textContent = 'Enlace de vista copiado con encuadre, orientación, capas y filtros.'; }
+    catch (error) { document.getElementById('share-view-status').textContent = 'No se pudo copiar automáticamente. Copia este enlace desde la barra del navegador: ' + shareUrl.href; }
+  });
   document.getElementById('clear-drawings').addEventListener('click', function () {
     if ((drawingRecords.length || measurementLayer.getLayers().length) && !window.confirm('¿Borrar todos los dibujos y mediciones de esta sesión?')) return;
     if (activeEdit) finishDrawingEdit(true);
