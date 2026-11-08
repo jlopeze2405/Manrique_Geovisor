@@ -1282,7 +1282,11 @@ async function main() {
   const originNorth = (extent.ymin + extent.ymax) / 2;
   const baseElevation = analysis.minimum;
   const textureLoader = new THREE.TextureLoader();
-  const tiles = [...manifest.tiles].sort((a, b) => a.row - b.row || a.column - b.column);
+  const tiles = manifest.tiles.filter(tile =>
+    tile.bbox.xmax > focusBounds.xmin && tile.bbox.xmin < focusBounds.xmax &&
+    tile.bbox.ymax > focusBounds.ymin && tile.bbox.ymin < focusBounds.ymax
+  ).sort((a, b) => a.row - b.row || a.column - b.column);
+  if (!tiles.length) throw new Error("Ninguna tesela de ortofoto intersecta el entorno del área de estudio.");
   const textures = new Map();
   let loadedTextures = 0;
   await Promise.all(tiles.map(async tile => {
