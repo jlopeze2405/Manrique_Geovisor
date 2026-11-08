@@ -616,11 +616,40 @@
 
   function neighborhoodForFeature(feature) {
     if (feature._neighborhoodLabel != null && neighborhoodFeatures.length) return feature._neighborhoodLabel;
+    var geometry = feature && feature.geometry;
+    if (!geometry || !neighborhoodFeatures.length) return '';
     var point = featureAnchor(feature);
-    if (!point) return '';
-    var found = neighborhoodFeatures.find(function (item) { return pointInGeometry(point, item.geometry); });
+    var pointIsInterior = point && pointInGeometry(point, geometry);
+    var found = pointIsInterior ? neighborhoodFeatures.find(function (item) { return pointInGeometry(point, item.geometry); }) : null;
+
+    // A polygon centroid can fall outside a concave/multipart feature. In that
+    // case, classify it from sampled points along its exterior boundary instead.
+    if (!found) {
+      var bounds = featureGeometryBounds(feature);
+      var samples = [];
+      var polygons = geometry.type === 'Polygon' ? [geometry.coordinates] : (geometry.type === 'MultiPolygon' ? geometry.coordinates : []);
+      polygons.forEach(function (polygon) {
+        var ring = polygon && polygon[0];
+        if (!ring || ring.length < 2) return;
+        var stride = Math.max(1, Math.ceil((ring.length - 1) / 160));
+        for (var i = 0; i < ring.length - 1; i += stride) {
+          var end = Math.min(i + stride, ring.length - 1);
+          var a = ring[i], b = ring[end];
+          samples.push(a, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]);
+        }
+      });
+      if (pointIsInterior) samples.push(point);
+      var bestScore = 0;
+      neighborhoodFeatures.forEach(function (item) {
+        if (!boundsOverlap(bounds, featureGeometryBounds(item))) return;
+        var score = 0;
+        samples.forEach(function (sample) { if (pointInGeometry(sample, item.geometry)) score++; });
+        if (pointIsInterior && pointInGeometry(point, item.geometry)) score += samples.length + 1;
+        if (score > bestScore) { bestScore = score; found = item; }
+      });
+    }
     var label = found ? String(propertyValue(found.properties, ['nombre', 'label']) || '') : '';
-    if (neighborhoodFeatures.length) feature._neighborhoodLabel = label;
+    feature._neighborhoodLabel = label;
     return label;
   }
 
@@ -970,21 +999,7 @@
   function matchesSelectedArea(feature) {
     var selected = neighborhoodFilter ? neighborhoodFilter.value : 'all';
     if (selected === 'all') return true;
-    feature._areaMembershipCache = feature._areaMembershipCache || {};
-    if (Object.prototype.hasOwnProperty.call(feature._areaMembershipCache, selected)) return feature._areaMembershipCache[selected];
-    var barrio = neighborhoodFeatures.find(function (item) {
-      return normalizedText(propertyValue(item.properties, ['nombre', 'label'])) === normalizedText(selected);
-    });
-    var matches = false;
-    if (barrio && feature.geometry && boundsOverlap(featureGeometryBounds(feature), featureGeometryBounds(barrio))) {
-      var featurePoint = featureAnchor(feature);
-      var barrioPoint = featureAnchor(barrio);
-      matches = pointInGeometry(featurePoint, barrio.geometry) || pointInGeometry(barrioPoint, feature.geometry) ||
-        geometryVertices(feature.geometry).some(function (point) { return pointInGeometry(point, barrio.geometry); }) ||
-        geometryVertices(barrio.geometry).some(function (point) { return pointInGeometry(point, feature.geometry); });
-    }
-    feature._areaMembershipCache[selected] = matches;
-    return matches;
+    return normalizedText(neighborhoodForFeature(feature)) === normalizedText(selected);
   }
 
   function featureUseKey(feature) {
