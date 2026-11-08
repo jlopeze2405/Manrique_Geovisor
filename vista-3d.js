@@ -738,7 +738,7 @@ function focusBoundsFromFeatures(source, margin, extent) {
   return focused;
 }
 
-function applySceneFocusClip(scene, bounds, originX, originNorth) {
+function applySceneFocusClip(scene, bounds, originX, originNorth, alreadyClippedObject = null) {
   const localXMin = bounds.xmin - originX;
   const localXMax = bounds.xmax - originX;
   const localZMin = originNorth - bounds.ymax;
@@ -751,6 +751,12 @@ function applySceneFocusClip(scene, bounds, originX, originNorth) {
   ];
   scene.traverse(object => {
     if (!object.material) return;
+    // Terrain and skirt vertices are clipped while their geometry is built.
+    // Applying GPU clipping to those same boundary vertices can cause depth
+    // precision artifacts along the vertical curtain.
+    let ancestor = object;
+    while (ancestor && ancestor !== alreadyClippedObject) ancestor = ancestor.parent;
+    if (alreadyClippedObject && ancestor === alreadyClippedObject) return;
     const materials = Array.isArray(object.material) ? object.material : [object.material];
     for (const material of materials) {
       material.clippingPlanes = planes;
@@ -1388,7 +1394,7 @@ async function main() {
   const parcelLayer = addParcelBoundaries(scene, parcelSource, elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
   const riskLayer = addPolygonOverlay(scene, riskSource, riskAttributes, "risk", elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
   const threatLayer = addPolygonOverlay(scene, threatSource, threatAttributes, "threat", elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
-  const focusClipPlanes = applySceneFocusClip(scene, focusBounds, originX, originNorth);
+  const focusClipPlanes = applySceneFocusClip(scene, focusBounds, originX, originNorth, terrainLayer);
   enableLayerToggle("layer-terrain", terrainLayer);
   enableLayerToggle("layer-buffer", bufferLayer);
   enableLayerToggle("layer-buildings", buildingLayer);
