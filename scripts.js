@@ -636,6 +636,7 @@
     }
     map.getContainer().style.cursor = selectionToolActive ? 'crosshair' : '';
     if (selectionToolActive) {
+      clearFeatureSelection();
       selectionMapDraggingBefore = map.dragging.enabled();
       map.dragging.disable();
     } else if (selectionMapDraggingBefore !== null) {
@@ -2112,6 +2113,23 @@
   });
   document.getElementById('spatial-relation').addEventListener('change', function () { if (lastSpatialQueryGeometry) runSpatialQuery(lastSpatialQueryGeometry); });
   document.getElementById('print-map').addEventListener('click', function () { window.print(); });
+  var topbarActions = document.querySelector('.map-topbar-actions');
+  var selectionToolButton = document.createElement('button');
+  selectionToolButton.id = 'toggle-feature-selection';
+  selectionToolButton.type = 'button';
+  selectionToolButton.className = 'map-badge selection-toggle';
+  selectionToolButton.setAttribute('aria-pressed', 'false');
+  selectionToolButton.setAttribute('aria-label', 'Activar la selección de entidades');
+  selectionToolButton.title = 'Activar la selección de entidades';
+  selectionToolButton.append(document.createTextNode('⌖ '));
+  var selectionToolLabel = document.createElement('span'); selectionToolLabel.textContent = 'SELECCIONAR ENTIDAD';
+  selectionToolButton.appendChild(selectionToolLabel);
+  var preview3dLink = document.querySelector('.preview-3d-link');
+  if (topbarActions) topbarActions.insertBefore(selectionToolButton, preview3dLink || null);
+  selectionToolButton.addEventListener('click', function () {
+    if (activeAction || activeEdit) return;
+    setSelectionToolActive(!selectionToolActive);
+  });
   var riskLegendToggle = document.getElementById('toggle-risk-legend');
   riskLegendToggle.addEventListener('click', function () {
     riskLegendUserHidden = !riskLegendUserHidden;
