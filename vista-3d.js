@@ -424,7 +424,7 @@ function addBuildingFootprints(scene, source, values, mask, width, height, exten
   lineGeometry.setAttribute("position", new THREE.Float32BufferAttribute(boundaryPositions, 3));
   const outlines = new THREE.LineSegments(lineGeometry, new THREE.LineBasicMaterial({ color: 0x5c321e, depthTest: true, toneMapped: false }));
   outlines.name = "building_footprints_outlines"; layer.add(outlines);
-  layer.userData = { featureCount: source.features.length - skippedFeatures.length, sourceFeatureCount: source.recordCount, polygonCount, holeCount, failedPolygons, skippedFeatureIds: skippedFeatures, source: CONFIG.buildingsUrl, crs: "EPSG:9377", ids: [...new Set(featureIds)] };
+  layer.userData = { featureCount: source.features.length - skippedFeatures.length, sourceFeatureCount: source.recordCount, polygonCount, holeCount, failedPolygons, skippedFeatureIds: skippedFeatures, features: source.features, source: CONFIG.buildingsUrl, crs: "EPSG:9377", ids: [...new Set(featureIds)] };
   scene.add(layer);
   return layer;
 }
@@ -508,13 +508,13 @@ function addPolygonOverlay(scene, source, categoryValues, kind, values, mask, wi
 }
 
 function addParcelBoundaries(scene, source, values, mask, width, height, extent, originX, originNorth, baseElevation) {
-  const positions=[]; let count=0;
+  const positions=[], featureIds=[]; let count=0;
   for(const feature of source.features) for(const part of buildingPolygonParts(feature)) for(const ring of [part.shell,...part.holes]) {
-    for(let i=0;i<ring.length;i++){const a=ring[i],b=ring[(i+1)%ring.length],ea=sampleRenderedSurfaceElevation(a.x,a.north,values,mask,width,height,extent),eb=sampleRenderedSurfaceElevation(b.x,b.north,values,mask,width,height,extent);if(ea===null||eb===null)continue;positions.push(a.x-originX,(ea-baseElevation)*CONFIG.verticalScale+0.42,a.north-originNorth,b.x-originX,(eb-baseElevation)*CONFIG.verticalScale+0.42,b.north-originNorth);} count++;
+    for(let i=0;i<ring.length;i++){const a=ring[i],b=ring[(i+1)%ring.length],ea=sampleRenderedSurfaceElevation(a.x,a.north,values,mask,width,height,extent),eb=sampleRenderedSurfaceElevation(b.x,b.north,values,mask,width,height,extent);if(ea===null||eb===null)continue;positions.push(a.x-originX,(ea-baseElevation)*CONFIG.verticalScale+0.42,a.north-originNorth,b.x-originX,(eb-baseElevation)*CONFIG.verticalScale+0.42,b.north-originNorth);featureIds.push(feature.id,feature.id);} count++;
   }
-  const geometry=new THREE.BufferGeometry();geometry.setAttribute("position",new THREE.Float32BufferAttribute(positions,3));
+  const geometry=new THREE.BufferGeometry();geometry.setAttribute("position",new THREE.Float32BufferAttribute(positions,3));geometry.setAttribute("featureId",new THREE.Float32BufferAttribute(featureIds,1));
   const layer=new THREE.Group();layer.name="parcel_boundaries_layer";layer.add(new THREE.LineSegments(geometry,new THREE.LineBasicMaterial({color:0x47c4d1,transparent:true,opacity:0.8,depthTest:true,toneMapped:false})));
-  layer.userData={featureCount:source.features.length,sourceRecordCount:source.recordCount,ringCount:count,source:CONFIG.parcelsUrl,crs:"EPSG:9377",attributesLoaded:false};scene.add(layer);return layer;
+  layer.userData={featureCount:source.features.length,sourceRecordCount:source.recordCount,ringCount:count,features:source.features,source:CONFIG.parcelsUrl,crs:"EPSG:9377",attributesLoaded:true};scene.add(layer);return layer;
 }
 
 function appendBuildingExtrusion(feature, parts, positions, featureIds, floorCounts, estimatedHeights, outlines, vertexColors,
@@ -705,6 +705,7 @@ function addEstimatedBuildingVolumes(scene, source, values, mask, width, height,
     buildMilliseconds: performance.now() - started,
     geometryBytes: positions.length * 4 + featureIds.length * 12 + outlines.length * 4,
     records,
+    features: source.features,
     recordIds: source.features.filter(feature => feature.heightStatus === "estimated").map(feature => feature.id),
     source: CONFIG.buildingsUrl,
     crs: "EPSG:9377",
