@@ -2103,10 +2103,6 @@
     rail.querySelector('.print-footer-date').textContent = formattedDate;
     var attribution = map.getContainer().querySelector('.leaflet-control-attribution');
     rail.querySelector('.print-attribution').textContent = attribution ? attribution.textContent.replace(/\s+/g, ' ').trim() : 'Fuentes visibles en el mapa.';
-    var title = Array.from(layerList.querySelectorAll('.layer-control-entry')).filter(function (entry) {
-      var input = entry.querySelector('input'); return input && input.checked;
-    }).map(function (entry) { var label = entry.querySelector('.layer-item label'); return label ? label.textContent.trim() : ''; }).filter(Boolean);
-    document.querySelector('.print-heading span').textContent = title.length ? 'Capas activas: ' + title.join(' · ') : 'Vista general del territorio';
   }
   window.addEventListener('beforeprint', function () {
     updatePrintComposition();
