@@ -7,4 +7,6 @@
 .workspace-tab-panels{min-height:0}
 .workspace-tab-panel[hidden]{display:none!important}
 .workspace-tab-panel>.panel-section:first-child{margin-top:8px}
+.map-navigation{z-index:900;pointer-events:auto}
+.map-navigation button{pointer-events:auto;touch-action:manipulation}
 @media(max-width:620px){.workspace-tabs{top:0;padding:8px 10px}.workspace-tab{min-height:42px;font-size:9px}}
