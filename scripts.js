@@ -34,6 +34,9 @@
   map.getPane('parcelPane').style.zIndex = 450;
   map.createPane('constructionPane');
   map.getPane('constructionPane').style.zIndex = 460;
+  map.createPane('diagnosticPane');
+  map.getPane('diagnosticPane').style.zIndex = 615;
+  map.getPane('diagnosticPane').style.pointerEvents = 'none';
   map.createPane('landmarkPane');
   map.getPane('landmarkPane').style.zIndex = 640;
   map.createPane('printGridPane');
@@ -57,6 +60,9 @@
   var scaleLimitedLayers = [];
   var parcelFilterFeatures = [];
   var constructionFilterFeatures = [];
+  var buildingDiagnosticFeaturesReady = false;
+  var buildingDiagnosticSelectedFeature = null;
+  var buildingDiagnosticHighlight = L.geoJSON(null, { style: { pane: 'diagnosticPane', color: '#0b7285', weight: 4, opacity: 1, fillColor: '#52cad5', fillOpacity: 0.2, dashArray: '7 4' } }).addTo(map);
   var neighborhoodFeatures = [];
   var riskZoneFeatures = [];
   var riskZonesReady = false;
