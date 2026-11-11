@@ -109,6 +109,7 @@
         <div class="draw-hint" id="draw-hint" aria-live="polite">Selecciona una geometría para comenzar.</div>
         <div class="drawing-history" id="drawing-history" aria-label="Geometrías dibujadas durante esta sesión"><p class="drawing-history-empty">Todavía no hay geometrías dibujadas.</p></div>
         <div class="drawing-export-row"><label for="drawing-export-format">Exportar dibujos</label><select id="drawing-export-format"><option value="geojson">GeoJSON · WGS 84</option><option value="kml">KML · WGS 84</option><option value="kmz">KMZ · WGS 84</option><option value="xlsx">Excel XLSX · coordenadas</option></select><select id="drawing-export-scope" aria-label="Geometrías a exportar"><option value="all">Todos</option><option value="selected">Solo seleccionados</option></select><button class="secondary-action" id="export-drawings" type="button">Descargar</button></div>
+        <div class="button-row draw-finish-row"><button class="action-button" id="finish-draw" disabled>Finalizar dibujo</button><button class="icon-button" id="cancel-draw" title="Cancelar dibujo" aria-label="Cancelar dibujo" disabled>×</button></div>
       </section>
 
       <section class="panel-section">
@@ -122,11 +123,8 @@
       </section>
 
       <section class="panel-section map-tools-section">
-        <div class="section-heading"><span class="section-icon">◉</span><div><h2>Navegación</h2><p>Vista y orientación</p></div></div>
-        <div class="button-row draw-finish-row"><button class="action-button" id="finish-draw" disabled>Finalizar dibujo</button><button class="icon-button" id="cancel-draw" title="Cancelar dibujo" aria-label="Cancelar dibujo" disabled>×</button></div>
-        <div class="navigation-row"><div class="zoom-control"><button id="zoom-in" title="Acercar" aria-label="Acercar">+</button><button id="zoom-out" title="Alejar" aria-label="Alejar">−</button></div><button id="reset-view" class="nav-action"><span>⌂</span>Vista inicial</button></div>
+        <div class="section-heading"><span class="section-icon">↗</span><div><h2>Acciones de sesión</h2><p>Comparte o limpia tus cambios</p></div></div>
         <button class="secondary-action" id="share-view" type="button">Compartir vista actual</button><p id="share-view-status" class="stats-note" aria-live="polite"></p>
-        <div class="rotation-row"><span>Orientación</span><div class="rotation-control"><button id="rotate-left" title="Girar a la izquierda" aria-label="Girar a la izquierda">↶</button><span id="bearing-label">N · 0°</span><button id="rotate-right" title="Girar a la derecha" aria-label="Girar a la derecha">↷</button></div></div>
         <button class="clear-button" id="clear-drawings">Borrar geometrías dibujadas</button>
       </section>
       </div>

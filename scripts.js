@@ -2263,11 +2263,6 @@
     }
     finishAction();
   });
-  document.getElementById('zoom-in').addEventListener('click', function () { map.zoomIn(); });
-  document.getElementById('zoom-out').addEventListener('click', function () { map.zoomOut(); });
-  document.getElementById('reset-view').addEventListener('click', function () { map.setView(initialCenter, initialZoom); setBearing(0); });
-  document.getElementById('rotate-left').addEventListener('click', function () { setBearing(bearing - 15); });
-  document.getElementById('rotate-right').addEventListener('click', function () { setBearing(bearing + 15); });
   document.querySelectorAll('[data-map-nav]').forEach(function (button) {
     button.addEventListener('click', function () {
       var action = button.dataset.mapNav;
@@ -2282,7 +2277,6 @@
   function syncBearingIndicator() {
     if (typeof map.getBearing === 'function') bearing = ((map.getBearing() % 360) + 360) % 360;
     keepThematicLayersUpright();
-    document.getElementById('bearing-label').textContent = 'N · ' + Math.round(bearing) + '°';
     var compassArrow = document.querySelector('.map-compass-arrow');
     if (compassArrow) compassArrow.style.transform = 'rotate(' + (-bearing) + 'deg)';
   }
