@@ -918,7 +918,8 @@ function setupFeatureSelection(scene, camera, renderer, controls, layers, surfac
   };
   const clearHighlight = () => {
     while (highlight.children.length) {
-      const child = highlight.children.pop();
+      const child = highlight.children[0];
+      highlight.remove(child);
       child.geometry.dispose(); child.material.dispose();
     }
   };
