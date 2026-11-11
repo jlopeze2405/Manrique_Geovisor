@@ -1189,6 +1189,130 @@
   if (neighborhoodFilter) neighborhoodFilter.addEventListener('change', applyDataFilters);
   if (landuseFilter) landuseFilter.addEventListener('change', applyDataFilters);
   if (entityFilter) entityFilter.addEventListener('input', applyDataFilters);
+
+  var buildingDiagnosticForm = document.getElementById('building-diagnostic-form');
+  var buildingDiagnosticInput = document.getElementById('building-diagnostic-cbml');
+  var buildingDiagnosticStatus = document.getElementById('building-diagnostic-status');
+  var buildingDiagnosticCandidates = document.getElementById('building-diagnostic-candidates');
+  var buildingDiagnosticRecord = document.getElementById('building-diagnostic-record');
+  var buildingDiagnosticSearchButton = document.getElementById('building-diagnostic-search');
+
+  function setBuildingDiagnosticReady(features) {
+    buildingDiagnosticFeaturesReady = true;
+    if (buildingDiagnosticSearchButton) buildingDiagnosticSearchButton.disabled = false;
+    if (buildingDiagnosticStatus) buildingDiagnosticStatus.textContent = 'Capa disponible: ' + features.length.toLocaleString('es') + ' construcciones. La búsqueda compara el CBML completo.';
+  }
+
+  function buildingDiagnosticSourceValue(properties, aliases) {
+    var value = propertyValue(properties, aliases);
+    if (value == null || String(value).trim() === '' || String(value).trim() === '0') return '';
+    return String(value).trim();
+  }
+
+  function appendBuildingDiagnosticAttribute(host, label, value) {
+    if (value == null || String(value).trim() === '') return;
+    var item = document.createElement('div'); item.className = 'diagnostic-attribute';
+    var key = document.createElement('span'); key.textContent = label;
+    var text = document.createElement('strong'); text.textContent = String(value);
+    item.append(key, text); host.appendChild(item);
+  }
+
+  function focusBuildingDiagnosticFeature(feature) {
+    if (!feature || !feature.geometry) return;
+    buildingDiagnosticSelectedFeature = feature;
+    buildingDiagnosticHighlight.clearLayers();
+    buildingDiagnosticHighlight.addData({ type: 'Feature', properties: {}, geometry: feature.geometry });
+    var bounds = feature._leafletLayer ? getLayerBounds(feature._leafletLayer) : null;
+    if (!bounds) bounds = L.geoJSON(feature).getBounds();
+    if (bounds && bounds.isValid()) map.fitBounds(bounds, { padding: [90, 90], maxZoom: 18, animate: true });
+  }
+
+  function renderBuildingDiagnosticRecord(feature, sourceIndex, matchIndex) {
+    buildingDiagnosticSelectedFeature = feature;
+    var properties = feature.properties || {};
+    document.getElementById('building-diagnostic-record-id').textContent = 'CBML ' + buildingDiagnosticSourceValue(properties, ['cbml']) + ' · Registro de capa ' + (sourceIndex + 1) + (matchIndex == null ? '' : ' · Resultado ' + (matchIndex + 1));
+    var attributes = document.getElementById('building-diagnostic-attributes');
+    attributes.textContent = '';
+    appendBuildingDiagnosticAttribute(attributes, 'ID de construcción (fuente)', buildingDiagnosticSourceValue(properties, ['id_constru']));
+    appendBuildingDiagnosticAttribute(attributes, 'Número de edificación (fuente)', buildingDiagnosticSourceValue(properties, ['numero_edi']));
+    appendBuildingDiagnosticAttribute(attributes, 'Tipo registrado', buildingDiagnosticSourceValue(properties, ['tipo_const']));
+    appendBuildingDiagnosticAttribute(attributes, 'Área construida registrada', buildingDiagnosticSourceValue(properties, ['area_const']));
+    appendBuildingDiagnosticAttribute(attributes, 'Pisos registrados', buildingDiagnosticSourceValue(properties, ['numero_pis']));
+    appendBuildingDiagnosticAttribute(attributes, 'Sótanos registrados', buildingDiagnosticSourceValue(properties, ['numero_sot']));
+    appendBuildingDiagnosticAttribute(attributes, 'Altura registrada', buildingDiagnosticSourceValue(properties, ['Altura']));
+    var threat = buildingDiagnosticSourceValue(properties, ['Cat_Amenza', 'grado_amen', 'categoria']);
+    var risk = buildingDiagnosticSourceValue(properties, ['Cat_Riesgo', 'riesgo']);
+    document.getElementById('building-diagnostic-threat').textContent = threat || 'Sin clasificación en el dato fuente';
+    document.getElementById('building-diagnostic-risk').textContent = risk || 'Sin clasificación en el dato fuente';
+    buildingDiagnosticRecord.hidden = false;
+    buildingDiagnosticCandidates.querySelectorAll('.diagnostic-candidate').forEach(function (item) { item.classList.toggle('is-selected', Number(item.dataset.sourceIndex) === sourceIndex); });
+    focusBuildingDiagnosticFeature(feature);
+  }
+
+  if (buildingDiagnosticForm) buildingDiagnosticForm.addEventListener('submit', function (event) {
+    event.preventDefault();
+    var requestedCbml = buildingDiagnosticInput.value.trim();
+    buildingDiagnosticRecord.hidden = true;
+    buildingDiagnosticCandidates.textContent = '';
+    buildingDiagnosticHighlight.clearLayers();
+    buildingDiagnosticSelectedFeature = null;
+    if (!/^\d{11}$/.test(requestedCbml)) {
+      buildingDiagnosticStatus.textContent = 'Escribe un CBML de exactamente 11 dígitos.';
+      buildingDiagnosticInput.focus();
+      return;
+    }
+    if (!buildingDiagnosticFeaturesReady) {
+      buildingDiagnosticStatus.textContent = 'La capa de construcciones aún se está cargando. Intenta de nuevo en unos segundos.';
+      return;
+    }
+    var matches = constructionFilterFeatures.filter(function (feature) {
+      return buildingDiagnosticSourceValue(feature.properties, ['cbml']) === requestedCbml;
+    });
+    if (!matches.length) {
+      buildingDiagnosticStatus.textContent = 'No se encontraron construcciones para ese CBML en la capa disponible.';
+      return;
+    }
+    buildingDiagnosticStatus.textContent = matches.length === 1
+      ? 'Se encontró 1 construcción. Selecciónala para revisar sus atributos registrados.'
+      : 'Se encontraron ' + matches.length.toLocaleString('es') + ' construcciones asociadas a este CBML. Selecciona el registro que quieres revisar.';
+    matches.forEach(function (feature, matchIndex) {
+      var sourceIndex = constructionFilterFeatures.indexOf(feature);
+      var properties = feature.properties || {};
+      var card = document.createElement('article'); card.className = 'diagnostic-candidate'; card.dataset.sourceIndex = String(sourceIndex);
+      var title = document.createElement('h3'); title.textContent = 'Construcción · registro de capa ' + (sourceIndex + 1);
+      var detailParts = [];
+      [['ID', ['id_constru']], ['Edificación', ['numero_edi']], ['Tipo', ['tipo_const']], ['Área fuente', ['area_const']]].forEach(function (item) {
+        var value = buildingDiagnosticSourceValue(properties, item[1]);
+        if (value) detailParts.push(item[0] + ': ' + value);
+      });
+      var detail = document.createElement('p'); detail.textContent = detailParts.length ? detailParts.join(' · ') : 'El registro no tiene más atributos descriptivos disponibles.';
+      var choose = document.createElement('button'); choose.type = 'button'; choose.textContent = 'Revisar'; choose.setAttribute('aria-label', 'Revisar construcción, registro de capa ' + (sourceIndex + 1));
+      choose.addEventListener('click', function () { renderBuildingDiagnosticRecord(feature, sourceIndex, matchIndex); });
+      card.append(title, detail, choose); buildingDiagnosticCandidates.appendChild(card);
+    });
+    if (matches.length === 1) {
+      var selected = matches[0];
+      renderBuildingDiagnosticRecord(selected, constructionFilterFeatures.indexOf(selected), 0);
+    }
+  });
+
+  var clearBuildingDiagnosticButton = document.getElementById('building-diagnostic-clear');
+  if (clearBuildingDiagnosticButton) clearBuildingDiagnosticButton.addEventListener('click', function () {
+    buildingDiagnosticForm.reset();
+    buildingDiagnosticCandidates.textContent = '';
+    buildingDiagnosticRecord.hidden = true;
+    buildingDiagnosticHighlight.clearLayers();
+    buildingDiagnosticSelectedFeature = null;
+    buildingDiagnosticStatus.textContent = buildingDiagnosticFeaturesReady
+      ? 'Capa disponible: ' + constructionFilterFeatures.length.toLocaleString('es') + ' construcciones. La búsqueda compara el CBML completo.'
+      : 'La búsqueda estará disponible cuando termine de cargar la capa de construcciones.';
+  });
+
+  var showBuildingDiagnosticOnMap = document.getElementById('building-diagnostic-map');
+  if (showBuildingDiagnosticOnMap) showBuildingDiagnosticOnMap.addEventListener('click', function () {
+    if (buildingDiagnosticSelectedFeature) focusBuildingDiagnosticFeature(buildingDiagnosticSelectedFeature);
+  });
+
   if (sharedViewRequested) {
     if (riskFilter && Array.from(riskFilter.options).some(function (option) { return option.value === sharedViewParams.get('riesgo'); })) riskFilter.value = sharedViewParams.get('riesgo');
     if (neighborhoodFilter && Array.from(neighborhoodFilter.options).some(function (option) { return option.value === sharedViewParams.get('barrio'); })) neighborhoodFilter.value = sharedViewParams.get('barrio');
@@ -1480,6 +1604,7 @@
       }
       group.addLayer(layer);
       group.featureData = features;
+      if (isConstructionLayer) setBuildingDiagnosticReady(features);
       var controlEntry = row && row.parentElement;
       if (controlEntry && controlEntry._customStyle) applyThemeStyle(layer, row._colorInput.value, Number(row._weightInput.value), false);
       else if (controlEntry && controlEntry._customWeight) applyLayerWeight(layer, Number(row._weightInput.value));
