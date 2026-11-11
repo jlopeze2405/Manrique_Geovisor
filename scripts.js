@@ -2229,13 +2229,18 @@
     var lngStart = Math.ceil(west / lngStep) * lngStep;
     var latInset = (north - south) * 0.018;
     var lngInset = (east - west) * 0.018;
+    function addGridLabel(position, coordinate, anchor, align) {
+      printGridLayer.addLayer(L.marker(position, { pane: 'printGridLabelPane', interactive: false, keyboard: false, icon: L.divIcon({ className: 'print-grid-label print-grid-label-' + align, html: formatGridCoordinate(coordinate, align === 'west' || align === 'east'), iconSize: [70, 12], iconAnchor: anchor }) }));
+    }
     for (var latitude = latStart; latitude <= north && latitude <= south + latStep * 20; latitude += latStep) {
-      printGridLayer.addLayer(L.polyline([[latitude, west], [latitude, east]], { pane: 'printGridPane', className: 'print-grid-line', color: '#173b4f', weight: 1, opacity: 0.55, dashArray: '5 5', interactive: false }));
-      printGridLayer.addLayer(L.marker([latitude + Math.min(latInset, latStep * 0.12), west + lngInset], { pane: 'printGridLabelPane', interactive: false, keyboard: false, icon: L.divIcon({ className: 'print-grid-label', html: formatGridCoordinate(latitude, true), iconSize: [58, 13], iconAnchor: [0, 0] }) }));
+      printGridLayer.addLayer(L.polyline([[latitude, west], [latitude, east]], { pane: 'printGridPane', className: 'print-grid-line', color: '#173b4f', weight: 0.7, opacity: 0.38, interactive: false }));
+      addGridLabel([latitude, west + lngInset], latitude, [0, 6], 'west');
+      addGridLabel([latitude, east - lngInset], latitude, [70, 6], 'east');
     }
     for (var longitude = lngStart; longitude <= east && longitude <= west + lngStep * 20; longitude += lngStep) {
-      printGridLayer.addLayer(L.polyline([[south, longitude], [north, longitude]], { pane: 'printGridPane', className: 'print-grid-line', color: '#173b4f', weight: 1, opacity: 0.55, dashArray: '5 5', interactive: false }));
-      printGridLayer.addLayer(L.marker([south + latInset, longitude + Math.min(lngInset, lngStep * 0.12)], { pane: 'printGridLabelPane', interactive: false, keyboard: false, icon: L.divIcon({ className: 'print-grid-label', html: formatGridCoordinate(longitude, false), iconSize: [58, 13], iconAnchor: [0, 0] }) }));
+      printGridLayer.addLayer(L.polyline([[south, longitude], [north, longitude]], { pane: 'printGridPane', className: 'print-grid-line', color: '#173b4f', weight: 0.7, opacity: 0.38, interactive: false }));
+      addGridLabel([south + latInset, longitude], longitude, [35, 12], 'south');
+      addGridLabel([north - latInset, longitude], longitude, [35, 0], 'north');
     }
   }
   window.addEventListener('beforeprint', function () {
