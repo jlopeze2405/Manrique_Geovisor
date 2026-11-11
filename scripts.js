@@ -62,7 +62,7 @@
   var constructionFilterFeatures = [];
   var buildingDiagnosticFeaturesReady = false;
   var buildingDiagnosticSelectedFeature = null;
-  var buildingDiagnosticHighlight = L.geoJSON(null, { style: { pane: 'diagnosticPane', color: '#0b7285', weight: 4, opacity: 1, fillColor: '#52cad5', fillOpacity: 0.2, dashArray: '7 4' } }).addTo(map);
+  var buildingDiagnosticHighlight = L.geoJSON(null, { pane: 'diagnosticPane', style: { color: '#0b7285', weight: 4, opacity: 1, fillColor: '#52cad5', fillOpacity: 0.2, dashArray: '7 4' } }).addTo(map);
   var neighborhoodFeatures = [];
   var riskZoneFeatures = [];
   var riskZonesReady = false;
