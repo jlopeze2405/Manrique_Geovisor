@@ -2074,13 +2074,30 @@
   });
   document.getElementById('spatial-relation').addEventListener('change', function () { if (lastSpatialQueryGeometry) runSpatialQuery(lastSpatialQueryGeometry); });
   document.getElementById('print-map').addEventListener('click', function () { window.print(); });
+  function updatePrintComposition() {
+    var rail = document.querySelector('.print-rail');
+    if (!rail) return;
+    var legend = rail.querySelector('.print-legend-content');
+    legend.textContent = '';
+    Array.from(activeLayerLegend.children).forEach(function (entry) { legend.appendChild(entry.cloneNode(true)); });
+    if (!legend.children.length) { var empty = document.createElement('p'); empty.textContent = 'Sin capas temáticas activas.'; legend.appendChild(empty); }
+    var center = map.getCenter();
+    rail.querySelector('.print-center').textContent = center.lat.toFixed(5) + '°, ' + center.lng.toFixed(5) + '°';
+    var scale = document.querySelector('.leaflet-control-scale-line');
+    rail.querySelector('.print-scale').textContent = scale ? scale.textContent : 'No disponible';
+    var now = new Date();
+    var formattedDate = new Intl.DateTimeFormat('es-CO', { year: 'numeric', month: 'long', day: 'numeric' }).format(now);
+    rail.querySelector('.print-date').textContent = formattedDate;
+    rail.querySelector('.print-footer-date').textContent = formattedDate;
+    var attribution = map.getContainer().querySelector('.leaflet-control-attribution');
+    rail.querySelector('.print-attribution').textContent = attribution ? attribution.textContent.replace(/\s+/g, ' ').trim() : 'Fuentes visibles en el mapa.';
+    var title = Array.from(layerList.querySelectorAll('.layer-control-entry')).filter(function (entry) {
+      var input = entry.querySelector('input'); return input && input.checked;
+    }).map(function (entry) { var label = entry.querySelector('.layer-item label'); return label ? label.textContent.trim() : ''; }).filter(Boolean);
+    document.querySelector('.print-heading span').textContent = title.length ? 'Capas activas: ' + title.join(' · ') : 'Vista general del territorio';
+  }
   window.addEventListener('beforeprint', function () {
-    var active = Array.from(layerList.querySelectorAll('.layer-item input:checked')).map(function (input) {
-      var name = input.closest('.layer-item').querySelector('label').textContent;
-      var layer = overlays[name];
-      return layer && layer._sourcePath ? name + ' (' + layer._sourcePath + ')' : name;
-    });
-    document.querySelector('.print-heading span').textContent = 'Capas visibles: ' + active.join(' · ') + ' · Escala y atribución cartográfica incluidas';
+    updatePrintComposition();
   });
   document.getElementById('inspector-close').addEventListener('click', function () { document.getElementById('feature-inspector').hidden = true; });
   document.getElementById('inspector-zoom').addEventListener('click', function () { var bounds = getLayerBounds(selectedInspectorLayer); if (bounds) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 18 }); });
