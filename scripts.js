@@ -2282,10 +2282,14 @@
   }
 
   function keepThematicLayersUpright() {
-    ['overlayPane', 'markerPane', 'shadowPane', 'tooltipPane', 'popupPane'].forEach(function (name) {
+    var mapSize = map.getSize();
+    var centerX = mapSize.x / 2;
+    var centerY = mapSize.y / 2;
+    // The project layers use custom panes directly under mapPane, so compensate them too.
+    ['overlayPane', 'markerPane', 'shadowPane', 'tooltipPane', 'popupPane', 'riskPane', 'parcelPane', 'constructionPane', 'landmarkPane'].forEach(function (name) {
       var pane = map.getPane(name);
       if (!pane) return;
-      pane.style.transformOrigin = '50% 50%';
+      pane.style.transformOrigin = centerX + 'px ' + centerY + 'px';
       pane.style.transform = bearing ? 'rotate(' + (-bearing) + 'deg)' : '';
     });
   }
