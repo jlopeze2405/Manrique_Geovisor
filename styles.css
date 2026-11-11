@@ -135,6 +135,9 @@ html,body{background:#edf2f5;color:#173b4f}.sidebar{background:linear-gradient(1
 .layer-list{display:block}.layer-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin:0 0 10px;padding:4px;border:1px solid #d5e0e8;border-radius:10px;background:#e8eff4}.layer-tab{min-width:0;min-height:38px;padding:6px 4px;border:1px solid transparent;border-radius:7px;background:transparent;color:#526b7d;font-size:8px;font-weight:700;line-height:1.2;cursor:pointer}.layer-tab:hover{background:#ffffff9c;color:#0b5363}.layer-tab.active{border-color:#b8d1d8;background:#fff;color:#0b5363;box-shadow:0 2px 7px #0b2e5910}.layer-group[hidden]{display:none}.layer-group{gap:6px}.layer-tab-panels{min-width:0}.layer-group-heading{padding:2px 1px 5px}.layer-group-heading strong{font-size:9px;color:#526b7d}
 @media(max-width:620px){.layer-tabs{gap:3px;padding:3px}.layer-tab{font-size:7px;min-height:35px}}
 
+/* Control para reducir la carga visual de la leyenda. */
+.legend-toggle{border:0;cursor:pointer;font:inherit;white-space:nowrap}
+.legend-toggle:hover{border-color:#0f7180;background:#e6f1f3;color:#0b5363}
 /* Composición cartográfica para impresión en carta horizontal. */
 .print-rail{display:none}
 @page{size:letter landscape;margin:0}
