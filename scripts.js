@@ -576,40 +576,35 @@
 
   function showFeatureInspector(layer) {
     if (!layer || !layer.feature) return;
-    var feature = layer.feature, p = feature.properties || {};
+    var feature = layer.feature, properties = feature.properties || {};
     var isParcel = !!layer._isParcelLayer;
+    var isConstruction = !!layer._isConstructionLayer;
     var panel = document.getElementById('feature-inspector');
     var content = document.getElementById('inspector-content');
     content.textContent = '';
-    document.getElementById('inspector-title').textContent = isParcel ? 'Detalle del predio' : 'Detalle de construcción';
-    var id = isParcel ? propertyValue(p, ['fid_', 'numero_pre', 'matricula_']) : propertyValue(p, ['id_constru', 'cbml', 'numero_edi']);
-    document.getElementById('inspector-subtitle').textContent = id ? 'Identificador: ' + id : 'Identificador no disponible en atributos';
-    inspectorValue('Barrio por ubicación', neighborhoodForFeature(feature) || 'Sin barrio asignado por los polígonos disponibles', content);
-    if (isParcel) {
-      inspectorValue('Número predial', propertyValue(p, ['numero_pre']), content);
-      inspectorValue('Matrícula', propertyValue(p, ['matricula_']), content);
-      inspectorValue('Destinación', propertyValue(p, ['destinacio']), content);
-      inspectorValue('Tipo de predio', propertyValue(p, ['tipo_predi']), content);
-      inspectorValue('Área registrada', propertyValue(p, ['Shape_Area']), content);
-    } else {
-      inspectorValue('CBML', propertyValue(p, ['cbml']), content);
-      inspectorValue('Tipo de construcción', propertyValue(p, ['tipo_const']), content);
-      inspectorValue('Número de pisos', propertyValue(p, ['numero_pis']), content);
-      inspectorValue('Área construida', propertyValue(p, ['area_const']), content);
-      inspectorValue('Altura', propertyValue(p, ['Altura']), content);
-    }
-    inspectorValue('Categoría de amenaza', propertyValue(p, ['Cat_Amenza']), content);
-    inspectorValue('Categoría de riesgo', propertyValue(p, ['Cat_Riesgo']), content);
-    selectedInspectorLayer = layer; panel.hidden = false;
+    document.getElementById('inspector-title').textContent = isParcel ? 'Detalle del predio' : (isConstruction ? 'Detalle de construccion' : 'Detalle de entidad');
+    var id = propertyValue(properties, ['fid_', 'id', 'objectid', 'numero_pre', 'matricula_', 'id_constru', 'cbml', 'numero_edi']);
+    document.getElementById('inspector-subtitle').textContent = (layer._featureLayerName || 'Capa seleccionada') + (id ? ' · Identificador: ' + id : '');
+    if (isParcel || isConstruction) inspectorValue('Barrio por ubicacion', neighborhoodForFeature(feature) || 'Sin barrio asignado por los poligonos disponibles', content);
+    Object.keys(properties).forEach(function (key) {
+      var value = properties[key];
+      if (value && typeof value === 'object') {
+        try { value = JSON.stringify(value); } catch (error) { value = String(value); }
+      }
+      inspectorValue(key, value == null || value === '' ? '—' : value, content);
+    });
+    var shareButton = document.getElementById('inspector-share');
+    if (shareButton) shareButton.hidden = !(isParcel || isConstruction);
+    selectedInspectorLayer = layer;
+    panel.hidden = false;
   }
-
   function selectFeatureLayer(layer) {
     if (selectedFeatureLayer && selectedFeatureLayer !== layer && selectedFeatureLayer._originalFeatureStyle) {
       selectedFeatureLayer.setStyle(selectedFeatureLayer._originalFeatureStyle);
     }
     selectedFeatureLayer = layer;
     attributeFocusedFeature = layer && layer.feature || null;
-    if (layer && (layer._isParcelLayer || layer._isConstructionLayer)) showFeatureInspector(layer);
+    if (layer && layer.feature) showFeatureInspector(layer);
     if (layer && typeof layer.setStyle === 'function') {
       layer.setStyle({ color: '#1976d2', weight: 4, opacity: 1, fillColor: '#1976d2', fillOpacity: 0, radius: 8 });
     }
@@ -1393,6 +1388,7 @@
           featureLayer.options.bubblingMouseEvents = false;
           featureLayer._isParcelLayer = isParcelLayer;
           featureLayer._isConstructionLayer = isConstructionLayer;
+          featureLayer._featureLayerName = name;
           var content = isParcelLayer ? buildParcelPopup(properties) : (isConstructionLayer ? buildConstructionPopup(properties) : document.createElement('div'));
           if (isParcelLayer || isConstructionLayer) {
             featureLayer.bindPopup(content, { maxWidth: 350, minWidth: 260, className: 'parcel-popup-container' });
@@ -1421,8 +1417,7 @@
             }
             if (selectionToolActive) {
               selectFeatureLayer(featureLayer);
-              if ((isParcelLayer || isConstructionLayer) && featureLayer.closePopup) featureLayer.closePopup();
-              else if (featureLayer.openPopup) featureLayer.openPopup();
+              if (featureLayer.closePopup) featureLayer.closePopup();
               return;
             }
           });
@@ -1596,13 +1591,14 @@
       style: { color: color, fillColor: color, weight: 2, opacity: 0.9, fillOpacity: 0.2 },
       pointToLayer: function (feature, latlng) { return L.circleMarker(latlng, { radius: 6, color: color, fillColor: color, weight: 2, fillOpacity: 0.75 }); },
       onEachFeature: function (feature, featureLayer) {
-        feature._leafletLayer = featureLayer; featureLayer._isTemporaryLayer = true;
+        feature._leafletLayer = featureLayer; featureLayer._isTemporaryLayer = true; featureLayer._featureLayerName = displayName;
         featureLayer.options.bubblingMouseEvents = false;
         var popup = document.createElement('div'); var heading = document.createElement('strong'); heading.textContent = feature.properties && feature.properties.name || displayName; popup.appendChild(heading);
         Object.keys(feature.properties || {}).forEach(function (key) { var line = document.createElement('div'); line.textContent = key + ': ' + String(feature.properties[key] == null ? '' : feature.properties[key]); popup.appendChild(line); });
         featureLayer.bindPopup(popup);
         if (featureLayer._openPopup) featureLayer.off('click', featureLayer._openPopup, featureLayer);
-        featureLayer.on('click', function (event) { if (activeAction || activeEdit) { if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent); return; } if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent); if (!selectionToolActive) { featureLayer.closePopup(); if (featureLayer.closeTooltip) featureLayer.closeTooltip(); return; } var bounds = getLayerBounds(featureLayer); if (bounds) map.fitBounds(bounds, { padding: [36, 36], maxZoom: 17 }); featureLayer.openPopup(); });
+        featureLayer._originalFeatureStyle = Object.assign({}, featureLayer.options);
+        featureLayer.on('click', function (event) { if (activeAction || activeEdit) { if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent); return; } if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent); if (!selectionToolActive) { featureLayer.closePopup(); if (featureLayer.closeTooltip) featureLayer.closeTooltip(); return; } selectFeatureLayer(featureLayer); var bounds = getLayerBounds(featureLayer); if (bounds) map.fitBounds(bounds, { padding: [36, 36], maxZoom: 17 }); featureLayer.closePopup(); });
       }
     });
     group.addLayer(geoLayer); group.featureData = features;
