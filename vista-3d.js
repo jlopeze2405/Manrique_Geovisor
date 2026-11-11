@@ -929,8 +929,8 @@ function setupFeatureSelection(scene, camera, renderer, controls, layers, surfac
     const positions = [];
     for (const ring of feature.rings) for (let index = 0; index < ring.length; index++) {
       const a = ring[index], b = ring[(index + 1) % ring.length];
-      const ea = sampleRenderedSurfaceElevation(a.x, a.north, ...surface);
-      const eb = sampleRenderedSurfaceElevation(b.x, b.north, ...surface);
+      const ea = sampleRenderedSurfaceElevation(a.x, a.north, ...surface.sampleArgs);
+      const eb = sampleRenderedSurfaceElevation(b.x, b.north, ...surface.sampleArgs);
       if (ea === null || eb === null) continue;
       positions.push(a.x - surface.originX, (ea - surface.baseElevation) * CONFIG.verticalScale + 1.1, a.north - surface.originNorth,
         b.x - surface.originX, (eb - surface.baseElevation) * CONFIG.verticalScale + 1.1, b.north - surface.originNorth);
@@ -1666,6 +1666,15 @@ async function main() {
   enableLayerToggle("layer-parcels", parcelLayer);
   enableLayerToggle("layer-risk", riskLayer);
   enableLayerToggle("layer-threat", threatLayer);
+  const selectionLayers = [
+    { key: "buildings", layer: buildingLayer, source: "Construcciones_Area_Estudio", features: new Map(buildingSource.features.map(feature => [feature.id, feature])), enabled: () => document.getElementById("layer-buildings").checked },
+    { key: "volumes", layer: estimatedBuildingLayer, source: "Construcciones_Area_Estudio", features: new Map(buildingSource.features.map(feature => [feature.id, feature])), enabled: () => document.getElementById("layer-building-volumes").checked },
+    { key: "parcels", layer: parcelLayer, source: "Predios_Influencia", features: new Map(parcelSource.features.map(feature => [feature.id, feature])), enabled: () => document.getElementById("layer-parcels").checked },
+    { key: "risk", layer: riskLayer, source: "RIESGO_MOV_MASA", features: new Map(riskSource.features.map(feature => [feature.id, feature])), enabled: () => document.getElementById("layer-risk").checked },
+    { key: "threat", layer: threatLayer, source: "Amenaza_Mov_Masa", features: new Map(threatSource.features.map(feature => [feature.id, feature])), enabled: () => document.getElementById("layer-threat").checked },
+    { key: "buffer", layer: bufferLayer, source: "Bff_Uva", features: new Map(bufferSource.features.map(feature => [feature.id, feature])), enabled: () => document.getElementById("layer-buffer").checked }
+  ];
+  setupFeatureSelection(scene, camera, renderer, controls, selectionLayers, { sampleArgs: [displaySurface.values, displaySurface.mask, width, height, extent], originX, originNorth, baseElevation });
   if (!renderedTriangles) throw new Error("No se generaron triángulos válidos; revise la máscara NoData del DEM.");
   const focusCenterX = (focusBounds.xmin + focusBounds.xmax) / 2;
   const focusCenterNorth = (focusBounds.ymin + focusBounds.ymax) / 2;
