@@ -1,4 +1,4 @@
-import * as THREE from "three";
+﻿import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { fromArrayBuffer } from "geotiff";
 
@@ -38,7 +38,6 @@ const CONFIG = Object.freeze({
 
 const container = document.getElementById("threeContainer");
 const statusEl = document.getElementById("load-state");
-const diagnosticsEl = document.getElementById("terrain-diagnostics");
 const compassNeedle = document.getElementById("compass-needle");
 const compassCardinals = document.getElementById("compass-cardinals");
 const northInView = new THREE.Vector3();
@@ -1010,27 +1009,6 @@ function createDisplaySurface(values, sourceMask, width, height) {
   return { values: currentValues, mask: new Uint8Array(sourceMask.length), filledCount: missingCount };
 }
 
-function reportNoData(result, width, height, pixelX, pixelY) {
-  const total = width * height;
-  const percent = result.missingCount / total * 100;
-  const largestArea = result.largest.size * pixelX * pixelY;
-  const rowRanges = [];
-  for (let row = 0; row < height; row++) {
-    let first = -1, last = -1, count = 0;
-    for (let column = 0; column < width; column++) {
-      if (result.mask[row * width + column]) {
-        if (first < 0) first = column;
-        last = column;
-        count++;
-      }
-    }
-    if (count > 0) rowRanges.push({ row, first, last, count });
-  }
-  const broadRows = rowRanges.filter(item => item.count >= Math.max(10, width * 0.1));
-  const broadSummary = broadRows.length ? broadRows.length + " filas tienen al menos " + formatNumber(Math.max(10, width * 0.1), 0) + " celdas NoData; la mayor ocupa " + result.largest.size + " celdas (" + formatNumber(largestArea, 0) + " m²), filas " + (result.largest.minRow + 1) + "–" + (result.largest.maxRow + 1) + ", columnas " + (result.largest.minColumn + 1) + "–" + (result.largest.maxColumn + 1) + "." : "No se detectaron franjas NoData extensas por fila.";
-  diagnosticsEl.innerHTML = "<strong>Diagnóstico DEM</strong><br>" + result.validCount.toLocaleString("es-CO") + " / " + total.toLocaleString("es-CO") + " celdas con elevación (" + formatNumber(result.minimum, 1) + "–" + formatNumber(result.maximum, 1) + " m).<br>" + result.missingCount.toLocaleString("es-CO") + " celdas NoData (" + formatNumber(percent, 1) + "%), en " + result.components + " zona(s) conectada(s). " + broadSummary + "<br>Las áreas NoData se completan solo para dibujar; los datos originales permanecen intactos.";
-}
-
 function sampleAt(values, mask, width, height, row, column) {
   if (row < 0 || row >= height || column < 0 || column >= width) return null;
   const index = row * width + column;
@@ -1409,7 +1387,7 @@ async function downloadTerrainPdf() {
 }
 
 async function main() {
-  if (!container || !statusEl || !diagnosticsEl) throw new Error("Faltan elementos requeridos en vista-3d.html.");
+  if (!container || !statusEl) throw new Error("Faltan elementos requeridos en vista-3d.html.");
   const { scene, camera } = await initializeScene();
   const maxTextureSize = renderer.backend && renderer.backend.device && renderer.backend.device.limits
     ? renderer.backend.device.limits.maxTextureDimension2D
@@ -1469,7 +1447,6 @@ async function main() {
   const nodata = nodataValue === null || nodataValue === undefined ? null : Number(nodataValue);
   const analysis = analyzeNoData(elevations, nodata, width, height);
   if (analysis.validCount === 0) throw new Error("El DEM no contiene valores de elevación válidos.");
-  reportNoData(analysis, width, height, extent.pixelX, extent.pixelY);
   const displaySurface = createDisplaySurface(elevations, analysis.mask, width, height);
   setStatus("DEM leído: " + width + " × " + height + " celdas. Analizando NoData antes de crear la superficie…", analysis.missingCount ? "warning" : "info");
   const worldCrs = Math.abs(extent.pixelX - 10) < 1e-6 && Math.abs(extent.pixelY - 10) < 1e-6;
@@ -1550,15 +1527,9 @@ async function main() {
   camera.updateProjectionMatrix();
   controls.update();
   setupNavigationButtons(camera, controls);
-  const dropped = (width + 1) * (height + 1) - validSurfaceQuads;
-  const byteEstimate = tiles.reduce((total, tile) => total + tile.width * tile.height * 4, 0);
-  const gpuEstimate = byteEstimate * 4 / 3;
-  const coveragePercent = textureCoverage.coverageRatio * 100;
   const uncoveredNorth = Math.max(0, extent.ymax - textureCoverage.imageExtent.ymax);
   setStatus("Terreno listo: " + buildingLayer.userData.featureCount.toLocaleString("es-CO") + " huellas, " + estimatedBuildingLayer.userData.featureCount.toLocaleString("es-CO") + " volúmenes estimados y " + estimatedBuildingLayer.userData.flatFootprintCount + " huellas sin volumen.", uncoveredNorth > CONFIG.extentToleranceMeters ? "warning" : "info");
-  diagnosticsEl.innerHTML += "<br><strong>Escenario enfocado</strong><br>Buffer de estudio con " + CONFIG.focusMarginMeters + " m de entorno visible. Extensión: " + formatNumber(focusBounds.xmax - focusBounds.xmin, 0) + " × " + formatNumber(focusBounds.ymax - focusBounds.ymin, 0) + " m. El recorte solo afecta la visualización; los archivos y validaciones usan sus extensiones completas.<br><strong>Superficie</strong><br>" + renderedTriangles.toLocaleString("es-CO") + " triángulos en los parches visibles; " + dropped.toLocaleString("es-CO") + " cuadrículas NoData en la fuente; " + displaySurface.filledCount.toLocaleString("es-CO") + " celdas completadas solo para visualización. Zócalo perimetral uniforme de " + terrainSkirt.userData.depthMeters + " m bajo la elevación mínima; " + terrainSkirt.userData.wallSegments.toLocaleString("es-CO") + " segmentos. Ortofoto cubre " + formatNumber(coveragePercent, 2) + "% del bbox DEM. Buffer geodésico de 270 m proyectado sobre la superficie del DEM. Origen local: E " + formatNumber(originX, 2) + " / N " + formatNumber(originNorth, 2) + " m. Factor vertical " + CONFIG.verticalScale.toFixed(1) + ".<br><strong>Construcciones</strong><br>" + buildingLayer.userData.featureCount.toLocaleString("es-CO") + " de " + buildingLayer.userData.sourceFeatureCount.toLocaleString("es-CO") + " registros, " + buildingLayer.userData.polygonCount.toLocaleString("es-CO") + " partes poligonales y " + buildingLayer.userData.holeCount.toLocaleString("es-CO") + " huecos. " + buildingLayer.userData.failedPolygons.toLocaleString("es-CO") + " polígonos omitidos por geometría o elevación incompleta. Huellas en gris rojizo con borde oscuro; cotas tomadas del DEM y desplazamiento visual de 0,25–0,55 m.<br><strong>Memoria estimada de texturas</strong><br>" + formatNumber(byteEstimate / (1024 ** 2), 0) + " MiB decodificadas; hasta " + formatNumber(gpuEstimate / (1024 ** 2), 0) + " MiB de GPU con mipmaps. El valor real depende del navegador y la GPU.";
   const estimateNote = document.querySelector(".estimate-note"); if (estimateNote) estimateNote.textContent = "Buffer de 270 m alrededor del area de influencia de la UVA La Armonia. Alturas estimadas: 2,10 m por piso; no son mediciones verificadas.";
-  diagnosticsEl.innerHTML += "<br><strong>Volúmenes estimados</strong><br>" + estimatedBuildingLayer.userData.featureCount.toLocaleString("es-CO") + " volúmenes, " + estimatedBuildingLayer.userData.triangleCount.toLocaleString("es-CO") + " triángulos y " + estimatedBuildingLayer.userData.vertexCount.toLocaleString("es-CO") + " vértices en " + estimatedBuildingLayer.userData.drawCalls + " llamadas de dibujo. Geometría: " + formatNumber(estimatedBuildingLayer.userData.geometryBytes / (1024 ** 2), 1) + " MiB; preparación: " + formatNumber(estimatedBuildingLayer.userData.buildMilliseconds, 0) + " ms. Prueba previa: " + extrusionSample.count + " construcciones con multipartes, huecos y pendiente. Alturas derivadas de numero_pis × 2,10; no son mediciones verificadas.";
   window.__terrain3d = { scene, camera, controls, renderer, textureCount: textures.size, validElevationCount: analysis.validCount, nodataCount: analysis.missingCount, nodataComponents: analysis.components, renderedTriangles, patchCount: tiles.length, focusBounds, focusClipPlanes, terrainSkirt, buildingLayer, estimatedBuildingLayer, parcelLayer, riskLayer, threatLayer, buildingRecordCount: buildingSource.recordCount, buildingAttributeCount: buildingAttributes.recordCount, parcelRecordCount: parcelSource.recordCount, riskRecordCount: riskSource.recordCount, threatRecordCount: threatSource.recordCount, extrusionSample, verticalScale: CONFIG.verticalScale };
   document.getElementById("download-map-pdf").disabled = false;
 }
@@ -1572,7 +1543,6 @@ window.addEventListener("afterprint", () => {
 main().catch(error => {
   console.error("Fallo al preparar el terreno Three.js:", error);
   setStatus("No se pudo cargar el terreno 3D. " + (error && error.message ? error.message : "Revisa la consola."), "error");
-  if (diagnosticsEl.textContent.startsWith("El análisis")) diagnosticsEl.textContent = "El diagnóstico no terminó. Comprueba que el módulo se abra desde Live Server y que los recursos estén disponibles.";
 });
 
 
