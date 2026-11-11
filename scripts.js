@@ -1147,6 +1147,7 @@
 
   var riskLegendPanel = null;
   var riskLegendEntries = [];
+  var riskLegendUserHidden = false;
 
   function updateRiskLegendPanel() {
     if (!riskLegendPanel) return;
@@ -1158,7 +1159,7 @@
       entry.element.hidden = !visible;
       if (visible) hasVisibleLegend = true;
     });
-    riskLegendPanel.hidden = !hasVisibleLegend;
+    riskLegendPanel.hidden = !hasVisibleLegend || riskLegendUserHidden;
   }
 
   function addRiskLegend(name, kind, group) {
@@ -2074,12 +2075,22 @@
   });
   document.getElementById('spatial-relation').addEventListener('change', function () { if (lastSpatialQueryGeometry) runSpatialQuery(lastSpatialQueryGeometry); });
   document.getElementById('print-map').addEventListener('click', function () { window.print(); });
+  var riskLegendToggle = document.getElementById('toggle-risk-legend');
+  riskLegendToggle.addEventListener('click', function () {
+    riskLegendUserHidden = !riskLegendUserHidden;
+    updateRiskLegendPanel();
+    riskLegendToggle.setAttribute('aria-expanded', String(!riskLegendUserHidden));
+    riskLegendToggle.title = riskLegendUserHidden ? 'Mostrar la simbología de capas de riesgo' : 'Ocultar la simbología de capas de riesgo';
+    riskLegendToggle.querySelector('span').textContent = riskLegendUserHidden ? 'MOSTRAR SIMBOLOGÍA' : 'OCULTAR SIMBOLOGÍA';
+  });
   function updatePrintComposition() {
     var rail = document.querySelector('.print-rail');
     if (!rail) return;
     var legend = rail.querySelector('.print-legend-content');
     legend.textContent = '';
-    Array.from(activeLayerLegend.children).forEach(function (entry) { legend.appendChild(entry.cloneNode(true)); });
+    var detailedRiskSections = riskLegendPanel ? Array.from(riskLegendPanel.querySelectorAll('.map-risk-legend-section')).filter(function (section) { return !section.hidden; }) : [];
+    if (detailedRiskSections.length) detailedRiskSections.forEach(function (section) { legend.appendChild(section.cloneNode(true)); });
+    else Array.from(activeLayerLegend.children).forEach(function (entry) { legend.appendChild(entry.cloneNode(true)); });
     if (!legend.children.length) { var empty = document.createElement('p'); empty.textContent = 'Sin capas temáticas activas.'; legend.appendChild(empty); }
     var center = map.getCenter();
     rail.querySelector('.print-center').textContent = center.lat.toFixed(5) + '°, ' + center.lng.toFixed(5) + '°';
@@ -2098,6 +2109,7 @@
   }
   window.addEventListener('beforeprint', function () {
     updatePrintComposition();
+    map.invalidateSize({ animate: false });
   });
   document.getElementById('inspector-close').addEventListener('click', function () { document.getElementById('feature-inspector').hidden = true; });
   document.getElementById('inspector-zoom').addEventListener('click', function () { var bounds = getLayerBounds(selectedInspectorLayer); if (bounds) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 18 }); });
