@@ -1551,7 +1551,14 @@ async function main() {
   const estimateNote = document.querySelector(".estimate-note"); if (estimateNote) estimateNote.textContent = "Buffer de 270 m alrededor del area de influencia de la UVA La Armonia. Alturas estimadas: 2,10 m por piso; no son mediciones verificadas.";
   diagnosticsEl.innerHTML += "<br><strong>Volúmenes estimados</strong><br>" + estimatedBuildingLayer.userData.featureCount.toLocaleString("es-CO") + " volúmenes, " + estimatedBuildingLayer.userData.triangleCount.toLocaleString("es-CO") + " triángulos y " + estimatedBuildingLayer.userData.vertexCount.toLocaleString("es-CO") + " vértices en " + estimatedBuildingLayer.userData.drawCalls + " llamadas de dibujo. Geometría: " + formatNumber(estimatedBuildingLayer.userData.geometryBytes / (1024 ** 2), 1) + " MiB; preparación: " + formatNumber(estimatedBuildingLayer.userData.buildMilliseconds, 0) + " ms. Prueba previa: " + extrusionSample.count + " construcciones con multipartes, huecos y pendiente. Alturas derivadas de numero_pis × 2,10; no son mediciones verificadas.";
   window.__terrain3d = { scene, camera, controls, renderer, textureCount: textures.size, validElevationCount: analysis.validCount, nodataCount: analysis.missingCount, nodataComponents: analysis.components, renderedTriangles, patchCount: tiles.length, focusBounds, focusClipPlanes, terrainSkirt, buildingLayer, estimatedBuildingLayer, parcelLayer, riskLayer, threatLayer, buildingRecordCount: buildingSource.recordCount, buildingAttributeCount: buildingAttributes.recordCount, parcelRecordCount: parcelSource.recordCount, riskRecordCount: riskSource.recordCount, threatRecordCount: threatSource.recordCount, extrusionSample, verticalScale: CONFIG.verticalScale };
+  document.getElementById("download-map-pdf").disabled = false;
 }
+
+document.getElementById("download-map-pdf").addEventListener("click", downloadTerrainPdf);
+window.addEventListener("afterprint", () => {
+  document.getElementById("print-sheet").setAttribute("aria-hidden", "true");
+  document.getElementById("print-3d-image").removeAttribute("src");
+});
 
 main().catch(error => {
   console.error("Fallo al preparar el terreno Three.js:", error);
