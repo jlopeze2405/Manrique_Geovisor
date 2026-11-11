@@ -1332,11 +1332,13 @@
     riskLegendPanel.hidden = !hasVisibleLegend || riskLegendUserHidden;
   }
 
-  function addRiskLegend(name, kind, group) {
+  function addRiskLegend(name, kind, group, constructionRiskLayer) {
     var items = kind === 'flood' ? [
       ['Alto no mitigable', '#b42332', 'dashed'], ['Alto mitigable', '#e87516'], ['Con condiciones', '#d6a41d']
     ] : kind === 'threat' ? [
       ['Amenaza alta', '#b42332', 'dashed'], ['Amenaza media', '#e98b16'], ['Amenaza baja', '#21845b']
+    ] : constructionRiskLayer ? [
+      ['Alto riesgo no mitigable', '#b42332', 'dashed'], ['Alto riesgo mitigable', '#e87516'], ['Riesgo medio', '#d6a41d'], ['Con condiciones de riesgo', '#8b9d26']
     ] : [
       ['Alto riesgo no mitigable', '#b42332', 'dashed'], ['Alto riesgo mitigable', '#e87516'], ['Riesgo medio', '#d6a41d'], ['Con condiciones de riesgo', '#8b9d26'], ['Riesgo bajo', '#21845b']
     ];
@@ -1612,7 +1614,7 @@
           row.appendChild(tableButton);
         }
       }
-      if (riskKind) addRiskLegend(name, riskKind, group);
+      if (riskKind) addRiskLegend(name, riskKind, group, isConstructionLayer);
       updateFeatureLabels();
       if (row) row.querySelector('.layer-state').textContent = row.querySelector('input').checked ? 'ON' : 'OFF';
       if (isParcelLayer || isConstructionLayer) updateScaleLimitedLayers();
