@@ -508,12 +508,25 @@ function addPolygonOverlay(scene, source, categoryValues, kind, values, mask, wi
 }
 
 function addParcelBoundaries(scene, source, values, mask, width, height, extent, originX, originNorth, baseElevation) {
-  const positions=[], featureIds=[]; let count=0;
-  for(const feature of source.features) for(const part of buildingPolygonParts(feature)) for(const ring of [part.shell,...part.holes]) {
-    for(let i=0;i<ring.length;i++){const a=ring[i],b=ring[(i+1)%ring.length],ea=sampleRenderedSurfaceElevation(a.x,a.north,values,mask,width,height,extent),eb=sampleRenderedSurfaceElevation(b.x,b.north,values,mask,width,height,extent);if(ea===null||eb===null)continue;positions.push(a.x-originX,(ea-baseElevation)*CONFIG.verticalScale+0.42,a.north-originNorth,b.x-originX,(eb-baseElevation)*CONFIG.verticalScale+0.42,b.north-originNorth);featureIds.push(feature.id,feature.id);} count++;
+  const positions=[], featureIds=[], fillPositions=[], fillIds=[]; let count=0;
+  for(const feature of source.features) for(const part of buildingPolygonParts(feature)) {
+    const flat=[part.shell,...part.holes], points=flat.flat();
+    for(const ring of flat) for(let i=0;i<ring.length;i++) {
+      const a=ring[i],b=ring[(i+1)%ring.length],ea=sampleRenderedSurfaceElevation(a.x,a.north,values,mask,width,height,extent),eb=sampleRenderedSurfaceElevation(b.x,b.north,values,mask,width,height,extent);
+      if(ea===null||eb===null)continue;
+      positions.push(a.x-originX,(ea-baseElevation)*CONFIG.verticalScale+0.42,a.north-originNorth,b.x-originX,(eb-baseElevation)*CONFIG.verticalScale+0.42,b.north-originNorth);featureIds.push(feature.id,feature.id);
+    }
+    const triangles=THREE.ShapeUtils.triangulateShape(part.shell.map(p=>new THREE.Vector2(p.x,p.north)),part.holes.map(r=>r.map(p=>new THREE.Vector2(p.x,p.north))));
+    const elevations=points.map(p=>sampleRenderedSurfaceElevation(p.x,p.north,values,mask,width,height,extent));
+    if(elevations.some(e=>e===null))continue;
+    for(const triangle of triangles) for(const index of triangle) { const p=points[index],e=elevations[index];fillPositions.push(p.x-originX,(e-baseElevation)*CONFIG.verticalScale+0.44,p.north-originNorth);fillIds.push(feature.id); }
+    count++;
   }
   const geometry=new THREE.BufferGeometry();geometry.setAttribute("position",new THREE.Float32BufferAttribute(positions,3));geometry.setAttribute("featureId",new THREE.Float32BufferAttribute(featureIds,1));
-  const layer=new THREE.Group();layer.name="parcel_boundaries_layer";layer.add(new THREE.LineSegments(geometry,new THREE.LineBasicMaterial({color:0x47c4d1,transparent:true,opacity:0.8,depthTest:true,toneMapped:false})));
+  const fillGeometry=new THREE.BufferGeometry();fillGeometry.setAttribute("position",new THREE.Float32BufferAttribute(fillPositions,3));fillGeometry.setAttribute("featureId",new THREE.Float32BufferAttribute(fillIds,1));
+  const layer=new THREE.Group();layer.name="parcel_boundaries_layer";
+  const selectableFill=new THREE.Mesh(fillGeometry,new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,colorWrite:false,depthWrite:false,side:THREE.DoubleSide}));selectableFill.name="parcel_selection_surface";layer.add(selectableFill);
+  layer.add(new THREE.LineSegments(geometry,new THREE.LineBasicMaterial({color:0x47c4d1,transparent:true,opacity:0.8,depthTest:true,toneMapped:false})));
   layer.userData={featureCount:source.features.length,sourceRecordCount:source.recordCount,ringCount:count,features:source.features,source:CONFIG.parcelsUrl,crs:"EPSG:9377",attributesLoaded:true};scene.add(layer);return layer;
 }
 
