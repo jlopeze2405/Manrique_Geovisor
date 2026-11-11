@@ -2303,7 +2303,7 @@
     map.setBearing(bearing);
     syncBearingIndicator();
   }
-  map.on('rotate', syncBearingIndicator);
+  map.on('rotate resize', syncBearingIndicator);
   if (sharedViewRequested) setBearing(Number(sharedViewParams.get('n')) || 0);
   document.getElementById('share-view').addEventListener('click', async function () {
     var shareUrl = new URL(window.location.href);
