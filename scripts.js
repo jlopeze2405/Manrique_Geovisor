@@ -113,6 +113,35 @@
   var selectedInspectorLayer = null;
   var metadataDialog = null;
 
+  function activateWorkspaceTab(key, focusTab) {
+    var tabs = Array.from(document.querySelectorAll('[data-workspace-tab]'));
+    var panels = Array.from(document.querySelectorAll('[data-workspace-panel]'));
+    tabs.forEach(function (tab) {
+      var active = tab.dataset.workspaceTab === key;
+      tab.classList.toggle('active', active);
+      tab.setAttribute('aria-selected', active ? 'true' : 'false');
+      tab.tabIndex = active ? 0 : -1;
+      if (active && focusTab) tab.focus();
+    });
+    panels.forEach(function (panel) {
+      var active = panel.dataset.workspacePanel === key;
+      panel.hidden = !active;
+      panel.classList.toggle('active', active);
+    });
+  }
+
+  document.querySelectorAll('[data-workspace-tab]').forEach(function (tab) {
+    tab.addEventListener('click', function () { activateWorkspaceTab(tab.dataset.workspaceTab, false); });
+    tab.addEventListener('keydown', function (event) {
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'Home' && event.key !== 'End') return;
+      event.preventDefault();
+      var tabs = Array.from(document.querySelectorAll('[data-workspace-tab]'));
+      var current = tabs.indexOf(tab);
+      var next = event.key === 'Home' ? 0 : (event.key === 'End' ? tabs.length - 1 : (current + (event.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length);
+      activateWorkspaceTab(tabs[next].dataset.workspaceTab, true);
+    });
+  });
+
   function showLayerMetadata(name, path, group) {
     if (!metadataDialog) {
       metadataDialog = document.createElement('dialog'); metadataDialog.className = 'metadata-dialog';
@@ -2252,9 +2281,19 @@
   });
   function syncBearingIndicator() {
     if (typeof map.getBearing === 'function') bearing = ((map.getBearing() % 360) + 360) % 360;
+    keepThematicLayersUpright();
     document.getElementById('bearing-label').textContent = 'N · ' + Math.round(bearing) + '°';
     var compassArrow = document.querySelector('.map-compass-arrow');
     if (compassArrow) compassArrow.style.transform = 'rotate(' + (-bearing) + 'deg)';
+  }
+
+  function keepThematicLayersUpright() {
+    ['overlayPane', 'markerPane', 'shadowPane', 'tooltipPane', 'popupPane'].forEach(function (name) {
+      var pane = map.getPane(name);
+      if (!pane) return;
+      pane.style.transformOrigin = '50% 50%';
+      pane.style.transform = bearing ? 'rotate(' + (-bearing) + 'deg)' : '';
+    });
   }
 
   function setBearing(value) {
