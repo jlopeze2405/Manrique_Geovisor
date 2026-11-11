@@ -2285,12 +2285,18 @@
     var mapSize = map.getSize();
     var centerX = mapSize.x / 2;
     var centerY = mapSize.y / 2;
-    // The project layers use custom panes directly under mapPane, so compensate them too.
-    ['overlayPane', 'markerPane', 'shadowPane', 'tooltipPane', 'popupPane', 'riskPane', 'parcelPane', 'constructionPane', 'landmarkPane'].forEach(function (name) {
-      var pane = map.getPane(name);
-      if (!pane) return;
-      pane.style.transformOrigin = centerX + 'px ' + centerY + 'px';
-      pane.style.transform = bearing ? 'rotate(' + (-bearing) + 'deg)' : '';
+    // Only overlayPane is inside Leaflet Rotate's rotating wrapper. The marker
+    // panes and project-specific panes are already outside it and must stay untouched.
+    var overlayPane = map.getPane('overlayPane');
+    if (overlayPane) {
+      overlayPane.style.transformOrigin = centerX + 'px ' + centerY + 'px';
+      overlayPane.style.transform = bearing ? 'rotate(' + (-bearing) + 'deg)' : '';
+    }
+    ['markerPane', 'shadowPane', 'tooltipPane', 'popupPane', 'riskPane', 'parcelPane', 'constructionPane', 'landmarkPane'].forEach(function (name) {
+      var staticPane = map.getPane(name);
+      if (!staticPane) return;
+      staticPane.style.transform = '';
+      staticPane.style.transformOrigin = '';
     });
   }
 
