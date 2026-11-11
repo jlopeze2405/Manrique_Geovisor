@@ -1388,6 +1388,9 @@
         },
         onEachFeature: function (feature, featureLayer) {
           var properties = feature && feature.properties ? feature.properties : {};
+          // A feature click is handled here; prevent Leaflet from forwarding it
+          // to the map click handler, which clears an active selection.
+          featureLayer.options.bubblingMouseEvents = false;
           featureLayer._isParcelLayer = isParcelLayer;
           featureLayer._isConstructionLayer = isConstructionLayer;
           var content = isParcelLayer ? buildParcelPopup(properties) : (isConstructionLayer ? buildConstructionPopup(properties) : document.createElement('div'));
@@ -1404,6 +1407,9 @@
             });
             featureLayer.bindPopup(content);
           }
+          // Keep the popup available for explicit actions, but do not let
+          // Leaflet open it on every map click automatically.
+          if (featureLayer._openPopup) featureLayer.off('click', featureLayer._openPopup, featureLayer);
           featureLayer._originalFeatureStyle = Object.assign({}, featureLayer.options);
           featureLayer.on('click', function (event) {
             if (activeAction || activeEdit) { if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent); return; }
@@ -1416,6 +1422,7 @@
             if (selectionToolActive) {
               selectFeatureLayer(featureLayer);
               if ((isParcelLayer || isConstructionLayer) && featureLayer.closePopup) featureLayer.closePopup();
+              else if (featureLayer.openPopup) featureLayer.openPopup();
               return;
             }
           });
@@ -1590,9 +1597,11 @@
       pointToLayer: function (feature, latlng) { return L.circleMarker(latlng, { radius: 6, color: color, fillColor: color, weight: 2, fillOpacity: 0.75 }); },
       onEachFeature: function (feature, featureLayer) {
         feature._leafletLayer = featureLayer; featureLayer._isTemporaryLayer = true;
+        featureLayer.options.bubblingMouseEvents = false;
         var popup = document.createElement('div'); var heading = document.createElement('strong'); heading.textContent = feature.properties && feature.properties.name || displayName; popup.appendChild(heading);
         Object.keys(feature.properties || {}).forEach(function (key) { var line = document.createElement('div'); line.textContent = key + ': ' + String(feature.properties[key] == null ? '' : feature.properties[key]); popup.appendChild(line); });
         featureLayer.bindPopup(popup);
+        if (featureLayer._openPopup) featureLayer.off('click', featureLayer._openPopup, featureLayer);
         featureLayer.on('click', function (event) { if (activeAction || activeEdit) { if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent); return; } if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent); if (!selectionToolActive) { featureLayer.closePopup(); if (featureLayer.closeTooltip) featureLayer.closeTooltip(); return; } var bounds = getLayerBounds(featureLayer); if (bounds) map.fitBounds(bounds, { padding: [36, 36], maxZoom: 17 }); featureLayer.openPopup(); });
       }
     });
@@ -2178,7 +2187,10 @@
 
   map.on('click', function (event) {
     if (activeEdit) return;
-    if (selectionToolActive && !activeAction) { clearFeatureSelection(); return; }
+    if (selectionToolActive && !activeAction) {
+      if (event.layer && event.layer.feature) return;
+      clearFeatureSelection(); return;
+    }
     if (!activeAction) return;
     if (activeAction.kind === 'draw' && activeAction.type === 'marker') {
       vertices = [event.latlng];
