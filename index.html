@@ -49,9 +49,6 @@
         <label class="filter-field">Barrio de la Comuna 3
           <select id="neighborhood-filter"><option value="all">Todos los barrios</option><option value="Santa Inés">Santa Inés</option><option value="Las Granjas">Las Granjas</option><option value="San José La Cima No.2">San José La Cima II</option><option value="Oriente">Oriente</option></select>
         </label>
-        <label class="filter-field">Uso / tipo de entidad
-          <select id="landuse-filter"><option value="all">Todos los usos disponibles</option></select>
-        </label>
         <label class="filter-field">Identificador predial o construcción
           <input id="entity-filter" type="search" placeholder="FID, matrícula, CBML o ID">
         </label>
@@ -65,20 +62,18 @@
 
       </div>
       <div class="workspace-tab-panel" id="workspace-panel-results" role="tabpanel" aria-labelledby="workspace-tab-results" data-workspace-panel="results" hidden>
-      <section class="panel-section stats-panel" aria-labelledby="stats-title">
-        <div class="section-heading"><span class="section-icon">▥</span><div><h2 id="stats-title">Resumen del área</h2><p id="stats-scope">Área de estudio completa</p></div></div>
+      <details class="panel-section stats-panel" aria-labelledby="stats-title">
+        <summary class="stats-summary"><span class="section-icon">▥</span><span><strong id="stats-title">Resumen del área</strong><small id="stats-scope">Área de estudio completa</small></span></summary>
         <div class="stats-grid">
           <article class="stat-card"><strong id="parcel-count">—</strong><span>Predios analizados</span></article>
           <article class="stat-card"><strong id="building-count">—</strong><span>Construcciones analizadas</span></article>
           <article class="stat-card"><strong id="building-risk-percent">—</strong><span>Construcciones superpuestas con zonas de riesgo</span></article>
         </div>
         <div id="risk-distribution" class="distribution-list" aria-live="polite"></div>
-        <h3 class="distribution-title">Uso / tipo registrado</h3>
-        <div id="landuse-distribution" class="distribution-list" aria-live="polite"></div>
         <h3 class="distribution-title">Entidades por barrio</h3>
         <div id="neighborhood-distribution" class="distribution-list" aria-live="polite"></div>
         <p class="stats-note">El porcentaje cuenta construcciones que intersectan geométricamente las zonas clasificadas como riesgo. Es una superposición cartográfica; no representa una evaluación predial ni sustituye un estudio técnico.</p>
-      </section>
+      </details>
 
       <section class="panel-section building-diagnostic" aria-labelledby="building-diagnostic-title">
         <div class="section-heading"><span class="section-icon" aria-hidden="true">⌕</span><div><h2 id="building-diagnostic-title">Diagnóstico individual de construcción</h2><p>Consulta por CBML · borrador</p></div><span class="diagnostic-draft-tag">BORRADOR</span></div>
@@ -114,7 +109,6 @@
       <section class="panel-section export-panel" aria-label="Exportar resultados">
         <div class="section-heading"><div><h2>Resultados y salida</h2><p>Usa los filtros activos</p></div></div>
         <button class="secondary-action" id="export-filtered" type="button">Descargar CSV filtrado</button>
-        <button class="secondary-action" id="export-geojson" type="button">Descargar resultados GeoJSON</button>
         <label class="filter-field">CRS de coordenadas de salida<select id="output-crs"><option value="4326">EPSG:4326 · WGS 84</option><option value="3116">EPSG:3116 · MAGNA-SIRGAS / Bogotá</option><option value="9377">EPSG:9377 · MAGNA-SIRGAS 2018 / Origen-Nacional</option></select></label>
         <button class="secondary-action" id="print-map" type="button">Imprimir composición del mapa</button>
       </section>
@@ -131,7 +125,7 @@
         </div>
         <div class="draw-hint" id="draw-hint" aria-live="polite">Selecciona una geometría para comenzar.</div>
         <div class="drawing-history" id="drawing-history" aria-label="Geometrías dibujadas durante esta sesión"><p class="drawing-history-empty">Todavía no hay geometrías dibujadas.</p></div>
-        <div class="drawing-export-row"><label for="drawing-export-format">Exportar dibujos</label><select id="drawing-export-format"><option value="geojson">GeoJSON · WGS 84</option><option value="kml">KML · WGS 84</option><option value="kmz">KMZ · WGS 84</option><option value="xlsx">Excel XLSX · coordenadas</option></select><select id="drawing-export-scope" aria-label="Geometrías a exportar"><option value="all">Todos</option><option value="selected">Solo seleccionados</option></select><button class="secondary-action" id="export-drawings" type="button">Descargar</button></div>
+        <div class="drawing-export-row"><label for="drawing-export-format">Exportar dibujos y mediciones</label><select id="drawing-export-format"><option value="geojson">GeoJSON · WGS 84</option><option value="kml">KML · WGS 84</option><option value="kmz">KMZ · WGS 84</option><option value="xlsx">Excel XLSX · coordenadas</option><option value="shp">Shapefile ZIP · WGS 84</option></select><select id="drawing-export-scope" aria-label="Geometrías a exportar"><option value="all">Todos</option><option value="selected">Solo seleccionados</option></select><button class="secondary-action" id="export-drawings" type="button">Descargar</button></div>
         <div class="button-row draw-finish-row"><button class="action-button" id="finish-draw" disabled>Finalizar dibujo</button><button class="icon-button" id="cancel-draw" title="Cancelar dibujo" aria-label="Cancelar dibujo" disabled>×</button></div>
       </section>
 
@@ -195,6 +189,7 @@
    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="https://unpkg.com/proj4@2.22.0/dist/proj4.js"></script>
     <script src="https://unpkg.com/jszip@3.10.2/dist/jszip.min.js"></script>
+    <script src="https://unpkg.com/@mapbox/shp-write@0.4.3/shpwrite.js"></script>
     <script src="https://unpkg.com/shpjs@6.2.0/dist/shp.js"></script>
     <script src="https://unpkg.com/georaster@1.6.0/dist/georaster.browser.bundle.min.js"></script>
     <script src="https://unpkg.com/georaster-layer-for-leaflet@3.10.0/dist/georaster-layer-for-leaflet.min.js"></script>

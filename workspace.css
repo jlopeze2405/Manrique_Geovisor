@@ -45,3 +45,16 @@
 .diagnostic-limit-note{margin:0;padding:8px;border-radius:7px;background:#fff8e8;color:#735718;font-size:8px;line-height:1.45}
 .diagnostic-pdf-placeholder{margin:0;opacity:.62;cursor:not-allowed}
 @media(max-width:620px){.diagnostic-classifications{grid-template-columns:1fr}.diagnostic-record-heading{flex-direction:column}.diagnostic-record-heading .secondary-action{width:100%}}
+
+/* Resumen del área plegable y escala cartográfica legible. */
+.stats-panel{padding:14px 16px}
+.stats-summary{display:flex;align-items:center;gap:10px;list-style:none;cursor:pointer}
+.stats-summary::-webkit-details-marker{display:none}
+.stats-summary::after{content:'+';margin-left:auto;color:#0f7180;font-size:20px;font-weight:500;line-height:1}
+.stats-panel[open]>.stats-summary::after{content:'−'}
+.stats-summary>span:nth-child(2){display:grid;gap:3px;min-width:0}
+.stats-summary strong{color:#173b5e;font-size:12px}
+.stats-summary small{color:#627d98;font-size:9px}
+.stats-panel>.stats-grid{margin-top:15px}
+.leaflet-control-scale{margin:0 16px 22px 0!important;padding:7px 9px;border:1px solid #d2dee8;border-radius:7px;background:#fffffff0;box-shadow:0 2px 9px #173b5e1a}
+.leaflet-control-scale-line{height:7px!important;border:1px solid #173b5e!important;border-top:0!important;border-radius:0 0 2px 2px;background:#ffffffd9!important;color:#173b5e!important;text-shadow:none!important;box-shadow:none!important;padding:2px 4px 0!important;font:600 9px/1.2 Arial,sans-serif!important}

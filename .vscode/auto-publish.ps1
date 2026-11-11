@@ -1,6 +1,10 @@
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$git = 'C:\Program Files\Git\cmd\git.exe'
+$gitCandidates = @(
+    (Join-Path $env:ProgramFiles 'Git\cmd\git.exe'),
+    (Join-Path $env:LOCALAPPDATA 'Programs\Git\cmd\git.exe')
+)
+$git = $gitCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
 $logRoot = Join-Path $env:TEMP 'ManriqueGeovisorAutoPublish'
 $logFile = Join-Path $logRoot 'watcher.log'
 $quietSeconds = 8
@@ -19,8 +23,8 @@ function Invoke-Git([string[]]$arguments) {
     return ($output -join [Environment]::NewLine)
 }
 
-if (-not (Test-Path -LiteralPath $git)) {
-    Write-Log "Git no encontrado en $git."
+if (-not $git) {
+    Write-Log 'Git no encontrado en las ubicaciones habituales.'
     exit 1
 }
 

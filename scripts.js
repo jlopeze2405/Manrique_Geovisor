@@ -54,7 +54,7 @@
     attribution: 'Tiles &copy; Esri, DeLorme, NAVTEQ, USGS, Intermap, NRCAN, Esri Japan, METI, Esri China (Hong Kong), TomTom'
   });
   imagery.addTo(map);
-  L.control.scale({ imperial: false, metric: true, maxWidth: 130, position: 'bottomright' }).addTo(map);
+  L.control.scale({ imperial: false, metric: true, maxWidth: 180, position: 'bottomright' }).addTo(map);
 
   var overlays = {};
   var scaleLimitedLayers = [];
@@ -115,7 +115,6 @@
   var layerGroupTabs = {};
   var layerGroupTabList = null;
   var layerGroupPanelList = null;
-  var landuseFilter = document.getElementById('landuse-filter');
   var entityFilter = document.getElementById('entity-filter');
   var spatialSelection = [];
   var spatialQueryActive = false;
@@ -865,7 +864,7 @@
     var target = features.find(function (feature) { return aliases.some(function (key) { var value = propertyValue(feature.properties, [key]); return value !== '' && normalizedText(value) === normalizedText(requested); }); });
     if (!target || !target._leafletLayer) return;
     directEntityLinkResolved = true;
-    if (riskFilter) riskFilter.value = 'all'; if (neighborhoodFilter) neighborhoodFilter.value = 'all'; if (landuseFilter) landuseFilter.value = 'all'; if (entityFilter) entityFilter.value = '';
+    if (riskFilter) riskFilter.value = 'all'; if (neighborhoodFilter) neighborhoodFilter.value = 'all'; if (entityFilter) entityFilter.value = '';
     applyDataFilters();
     Object.keys(overlays).forEach(function (name) {
       var group = overlays[name];
@@ -1068,17 +1067,10 @@
     return normalizedText(neighborhoodForFeature(feature)) === normalizedText(selected);
   }
 
-  function featureUseKey(feature) {
-    var p = feature.properties || {};
-    return feature._entityKind === 'parcel' ? propertyValue(p, ['destinacio', 'tipo_predi']) : propertyValue(p, ['tipo_const']);
-  }
-
   function passesDataFilters(feature) {
     var selectedRisk = riskFilter ? riskFilter.value : 'all';
     if (!matchesSelectedArea(feature)) return false;
     if (selectedRisk !== 'all' && riskGroup(feature.properties) !== selectedRisk) return false;
-    var use = landuseFilter ? landuseFilter.value : 'all';
-    if (use !== 'all' && featureUseKey(feature) !== use) return false;
     var query = entityFilter ? normalizedText(entityFilter.value.trim()) : '';
     if (query) {
       var p = feature.properties || {};
@@ -1090,22 +1082,6 @@
 
   function filteredEntities() {
     return { parcels: parcelFilterFeatures.filter(passesDataFilters), buildings: constructionFilterFeatures.filter(passesDataFilters) };
-  }
-
-  function populateLanduseFilter() {
-    if (!landuseFilter) return;
-    var current = landuseFilter.value;
-    var values = [];
-    parcelFilterFeatures.concat(constructionFilterFeatures).forEach(function (feature) {
-      var value = featureUseKey(feature);
-      if (value != null && String(value).trim() && values.indexOf(String(value)) === -1) values.push(String(value));
-    });
-    values.sort(function (a, b) { return a.localeCompare(b, 'es'); });
-    landuseFilter.textContent = '';
-    var all = document.createElement('option'); all.value = 'all'; all.textContent = 'Todos los usos disponibles'; landuseFilter.appendChild(all);
-    values.forEach(function (value) { var option = document.createElement('option'); option.value = value; option.textContent = value; landuseFilter.appendChild(option); });
-    if (sharedViewRequested && sharedViewParams.has('uso') && values.indexOf(sharedViewParams.get('uso')) !== -1) landuseFilter.value = sharedViewParams.get('uso');
-    else if (values.indexOf(current) !== -1) landuseFilter.value = current;
   }
 
   function applyDataFilters() {
@@ -1146,7 +1122,6 @@
       var scopeParts = [];
       if (selected !== 'all' && neighborhoodFilter) scopeParts.push('barrio: ' + neighborhoodFilter.options[neighborhoodFilter.selectedIndex].textContent);
       if (riskFilter && riskFilter.value !== 'all') scopeParts.push('riesgo: ' + riskFilter.options[riskFilter.selectedIndex].textContent);
-      if (landuseFilter && landuseFilter.value !== 'all') scopeParts.push('uso: ' + landuseFilter.options[landuseFilter.selectedIndex].textContent);
       if (entityFilter && entityFilter.value.trim()) scopeParts.push('identificador: ' + entityFilter.value.trim());
       scopeNode.textContent = scopeParts.length ? 'Filtros activos · ' + scopeParts.join(' · ') : 'Área de estudio · sin filtros';
     }
@@ -1178,16 +1153,11 @@
       });
     }
     var entities = parcels.concat(buildings);
-    renderDistribution('landuse-distribution', entities, function (feature) {
-      var value = featureUseKey(feature);
-      return (feature._entityKind === 'parcel' ? 'Predio · ' : 'Construcción · ') + (value == null || String(value).trim() === '' ? 'Sin dato' : String(value));
-    });
     renderDistribution('neighborhood-distribution', entities, function (feature) { return neighborhoodForFeature(feature) || 'Sin barrio asignado'; });
   }
 
   if (riskFilter) riskFilter.addEventListener('change', applyDataFilters);
   if (neighborhoodFilter) neighborhoodFilter.addEventListener('change', applyDataFilters);
-  if (landuseFilter) landuseFilter.addEventListener('change', applyDataFilters);
   if (entityFilter) entityFilter.addEventListener('input', applyDataFilters);
 
   var buildingDiagnosticForm = document.getElementById('building-diagnostic-form');
@@ -1201,6 +1171,16 @@
     buildingDiagnosticFeaturesReady = true;
     if (buildingDiagnosticSearchButton) buildingDiagnosticSearchButton.disabled = false;
     if (buildingDiagnosticStatus) buildingDiagnosticStatus.textContent = 'Capa disponible: ' + features.length.toLocaleString('es') + ' construcciones. La búsqueda compara el CBML completo.';
+  }
+
+  function normalizeBuildingCbml(value) {
+    var normalized = String(value == null ? '' : value).trim().replace(/\.0+$/, '');
+    if (/^\d{1,11}$/.test(normalized)) return normalized.padStart(11, '0');
+    if (/^\d+(?:\.\d+)?e[+-]?\d+$/i.test(normalized)) {
+      var numeric = Number(normalized);
+      if (Number.isSafeInteger(numeric) && numeric >= 0) return String(numeric).padStart(11, '0');
+    }
+    return normalized;
   }
 
   function buildingDiagnosticSourceValue(properties, aliases) {
@@ -1266,7 +1246,7 @@
       return;
     }
     var matches = constructionFilterFeatures.filter(function (feature) {
-      return buildingDiagnosticSourceValue(feature.properties, ['cbml']) === requestedCbml;
+      return normalizeBuildingCbml(buildingDiagnosticSourceValue(feature.properties, ['cbml'])) === requestedCbml;
     });
     if (!matches.length) {
       buildingDiagnosticStatus.textContent = 'No se encontraron construcciones para ese CBML en la capa disponible.';
@@ -1620,7 +1600,7 @@
       if (isParcelLayer || isConstructionLayer) updateScaleLimitedLayers();
       if (path.indexOf('Barrios_Manrique') !== -1) applyDataFilters();
       if (isRiskZoneLayer && riskKind === 'landslide') applyDataFilters();
-      if (isParcelLayer || isConstructionLayer) { populateLanduseFilter(); applyDataFilters(); }
+      if (isParcelLayer || isConstructionLayer) applyDataFilters();
       if (isParcelLayer || isConstructionLayer) tryResolveDirectEntityLink();
       if (showTable) {
         if (row && !row.querySelector('.layer-table-button')) {
@@ -1895,10 +1875,11 @@
   // no son capas vectoriales del panel Catastro y territorio.
   function updateActionButtons() {
     var active = !!activeAction;
-    finishButton.disabled = !active || (activeAction && activeAction.kind === 'draw' && activeAction.type === 'marker') || vertices.length < (activeAction && activeAction.type === 'polygon' ? 3 : 2);
+    var minimumVertices = activeAction && activeAction.type === 'polygon' ? 3 : (activeAction && activeAction.type === 'marker' ? 1 : 2);
+    finishButton.disabled = !active || vertices.length < minimumVertices;
     cancelButton.disabled = !active;
     undoButton.disabled = !active || vertices.length === 0;
-    finishButton.textContent = activeAction && activeAction.kind === 'measure' ? 'Terminar medición' : 'Finalizar dibujo';
+    finishButton.textContent = activeAction && activeAction.kind === 'measure' ? 'Terminar medición' : (activeAction && activeAction.type === 'marker' ? 'Finalizar puntos' : 'Finalizar dibujo');
     document.querySelectorAll('[data-draw]').forEach(function (button) {
       button.classList.toggle('active', activeAction && activeAction.kind === 'draw' && activeAction.type === button.dataset.draw);
     });
@@ -2018,18 +1999,39 @@
   function exportDrawingFeatures() {
     var selectedOnly = document.getElementById('drawing-export-scope').value === 'selected';
     var records = drawingRecords.filter(function (record) { return !selectedOnly || record.selected; });
-    if (!records.length) { hint.textContent = selectedOnly ? 'Selecciona uno o más dibujos en el historial para exportarlos.' : 'No hay dibujos para exportar.'; return; }
+    var measurementCount = selectedOnly ? 0 : measurementLayer.getLayers().length;
+    if (!records.length && !measurementCount) { hint.textContent = selectedOnly ? 'Selecciona uno o mÃ¡s dibujos en el historial para exportarlos.' : 'No hay dibujos ni mediciones para exportar.'; return; }
     var features = records.map(function (record, index) {
       var feature = record.layer.toGeoJSON(7);
       feature.properties = { nombre: record.name, tipo: record.type === 'marker' ? 'Punto' : (record.type === 'polyline' ? 'Línea' : 'Polígono'), id: record.id };
       feature.id = record.id;
       return feature;
     });
+    if (!selectedOnly) measurementLayer.eachLayer(function (layer, index) {
+      var feature = layer.toGeoJSON(7);
+      var popupText = layer.getPopup && layer.getPopup() ? String(layer.getPopup().getContent()) : '';
+      var isArea = feature.geometry && feature.geometry.type === 'Polygon';
+      var measuredValue = isArea
+        ? formatArea(geodesicArea((layer.getLatLngs()[0] || [])))
+        : formatDistance(pathLength(layer.getLatLngs(), false));
+      feature.properties = { nombre: 'Medición ' + (index + 1), tipo: isArea ? (popupText.indexOf('Perímetro') === 0 ? 'Perímetro' : 'Área') : 'Distancia', id: 'M' + (index + 1), medida: measuredValue };
+      feature.id = 'M' + (index + 1);
+      features.push(feature);
+    });
     var format = document.getElementById('drawing-export-format').value;
     var blob, filename;
     if (format === 'geojson') {
       blob = new Blob([JSON.stringify({ type: 'FeatureCollection', name: 'Dibujos GeoVisor Manrique', crs: { type: 'name', properties: { name: 'EPSG:4326' } }, features: features })], { type: 'application/geo+json;charset=utf-8' });
       filename = 'geovisor-manrique-dibujos.geojson';
+    } else if (format === 'shp') {
+      if (!window.shpwrite || typeof window.shpwrite.zip !== 'function') { hint.textContent = 'No se pudo exportar SHP: el escritor de shapefile no está disponible. Revisa la conexión al CDN y vuelve a intentarlo.'; return; }
+      var shapefileCollection = { type: 'FeatureCollection', features: features.filter(function (feature) { return feature.geometry && feature.geometry.type !== 'GeometryCollection'; }) };
+      window.shpwrite.zip(shapefileCollection, { folder: 'geomanrique', filename: 'geomanrique-dibujos-mediciones', outputType: 'blob', types: { point: 'puntos', polyline: 'lineas', polygon: 'poligonos' }, prj: 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433]]' }).then(function (zipBlob) {
+        downloadBlob(zipBlob, 'geomanrique-dibujos-mediciones.zip');
+        hint.textContent = shapefileCollection.features.length.toLocaleString('es') + ' dibujos y mediciones exportados como shapefile WGS 84. Los archivos se agrupan por tipo de geometría.';
+      }).catch(function (error) { hint.textContent = 'No se pudo crear el shapefile: ' + error.message; });
+      hint.textContent = 'Preparando shapefile ZIP…';
+      return;
     } else {
       function escapeXml(value) { return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;'); }
       function coordList(coords) { return coords.map(function (point) { return point[0] + ',' + point[1] + (point[2] == null ? '' : ',' + point[2]); }).join(' '); }
@@ -2082,7 +2084,7 @@
       document.getElementById('measure-result').innerHTML = '<span class="result-dot"></span><span>Marca puntos en el mapa para medir.</span>';
       hint.textContent = type === 'distance' ? 'Marca al menos dos puntos; doble clic o “Terminar medición” para cerrar.' : 'Marca el contorno del polígono; necesitas tres puntos.';
     } else {
-      hint.textContent = type === 'marker' ? 'Haz clic en el mapa para colocar el punto.' : 'Haz clic para agregar vértices y finaliza el dibujo.';
+      hint.textContent = type === 'marker' ? 'Marca todos los puntos y pulsa Finalizar puntos.' : 'Haz clic para agregar vértices y finaliza el dibujo.';
     }
     document.body.classList.add('drawing');
     map.doubleClickZoom.disable();
@@ -2122,7 +2124,7 @@
     vertexMarkers.push(marker);
     updateActionButtons();
     if (activeAction.kind === 'measure') updateMeasurementPreview();
-    else updateDrawingPreview();
+    else if (activeAction.type !== 'marker') updateDrawingPreview();
   }
 
   function updateDrawingPreview(cursor) {
@@ -2165,11 +2167,13 @@
     if (action.kind === 'draw') {
       if (action.type === 'marker') {
         if (vertices.length) {
-          var marker = L.marker(vertices[0], { icon: L.divIcon({ className: 'draw-point-icon', html: '<span></span>', iconSize: [16, 16], iconAnchor: [8, 8] }) });
-          marker.bindPopup('<b>Punto dibujado</b><br>' + vertices[0].lat.toFixed(6) + ', ' + vertices[0].lng.toFixed(6));
+          vertices.forEach(function (point) {
+          var marker = L.marker(point, { icon: L.divIcon({ className: 'draw-point-icon', html: '<span></span>', iconSize: [16, 16], iconAnchor: [8, 8] }) });
+          marker.bindPopup('<b>Punto dibujado</b><br>' + point.lat.toFixed(6) + ', ' + point.lng.toFixed(6));
           drawings.addLayer(marker);
           registerDrawing(marker, 'marker');
-          endAction('Punto agregado al mapa.');
+          });
+          endAction(vertices.length.toLocaleString('es') + ' puntos agregados al mapa.');
         }
       } else if ((action.type === 'polyline' && vertices.length >= 2) || (action.type === 'polygon' && vertices.length >= 3)) {
         var queryGeometry = action.type === 'polygon' ? L.polygon(vertices).toGeoJSON().geometry : null;
@@ -2256,26 +2260,7 @@
     } catch (error) { document.getElementById('spatial-result').textContent = 'No se pudo exportar CSV: ' + error.message; }
   }
 
-  function downloadGeoJSON() {
-    try {
-      var entities = spatialQueryActive ? spatialSelection.filter(function (item) { return passesDataFilters(item.feature); }).map(function (item) { return item.feature; }) : (function () { var current = filteredEntities(); return current.parcels.concat(current.buildings); }());
-      var outputCrs = document.getElementById('output-crs').value;
-      function transformGeometry(geometry) {
-        if (geometry.coordinates) geometry.coordinates = (function walk(value) {
-          if (Array.isArray(value) && value.length >= 2 && typeof value[0] === 'number' && typeof value[1] === 'number') return exportCoordinate(value.slice(0, 2), outputCrs).concat(value.slice(2));
-          return Array.isArray(value) ? value.map(walk) : value;
-        }(geometry.coordinates));
-        if (geometry.geometries) geometry.geometries.forEach(transformGeometry);
-        return geometry;
-      }
-      var features = entities.filter(function (feature) { return feature.geometry; }).map(function (feature) { return { type: 'Feature', id: feature.id, properties: Object.assign({}, feature.properties || {}), geometry: transformGeometry(JSON.parse(JSON.stringify(feature.geometry))) }; });
-      var data = { type: 'FeatureCollection', name: 'GeoVisor Manrique EPSG:' + outputCrs, crs: { type: 'name', properties: { name: 'EPSG:' + outputCrs } }, features: features };
-      downloadBlob(new Blob([JSON.stringify(data)], { type: 'application/geo+json;charset=utf-8' }), 'geovisor-manrique-resultados-epsg-' + outputCrs + '.geojson');
-    } catch (error) { document.getElementById('spatial-result').textContent = 'No se pudo exportar GeoJSON: ' + error.message; }
-  }
-
   document.getElementById('export-filtered').addEventListener('click', downloadCSV);
-  document.getElementById('export-geojson').addEventListener('click', downloadGeoJSON);
   document.getElementById('open-spatial-results').addEventListener('click', function () {
     var results = spatialSelection.filter(function (item) { return passesDataFilters(item.feature); }).map(function (item) { return item.feature; });
     showAttributeTable('Resultados de consulta espacial', results);
@@ -2403,11 +2388,6 @@
       clearFeatureSelection(); return;
     }
     if (!activeAction) return;
-    if (activeAction.kind === 'draw' && activeAction.type === 'marker') {
-      vertices = [event.latlng];
-      finishAction();
-      return;
-    }
     addVertex(event.latlng);
   });
   map.on('mousemove', function (event) {
@@ -2441,6 +2421,15 @@
   map.on('dblclick', function (event) {
     if (!activeAction) return;
     L.DomEvent.stop(event.originalEvent);
+    if (activeAction.kind === 'draw' && activeAction.type === 'marker') {
+      if (vertices.length > 1 && vertices[vertices.length - 1].distanceTo(vertices[vertices.length - 2]) < 0.5) {
+        vertices.pop();
+        var duplicatePointMarker = vertexMarkers.pop();
+        if (duplicatePointMarker) map.removeLayer(duplicatePointMarker);
+      }
+      finishAction();
+      return;
+    }
     if (vertices.length > 1 && vertices[vertices.length - 1].distanceTo(vertices[vertices.length - 2]) < 0.5) {
       vertices.pop();
       var duplicateMarker = vertexMarkers.pop();
@@ -2466,7 +2455,6 @@
     shareUrl.searchParams.set('z', map.getZoom().toFixed(2));
     if (riskFilter) shareUrl.searchParams.set('riesgo', riskFilter.value);
     if (neighborhoodFilter) shareUrl.searchParams.set('barrio', neighborhoodFilter.value);
-    if (landuseFilter && landuseFilter.value !== 'all') shareUrl.searchParams.set('uso', landuseFilter.value);
     if (entityFilter && entityFilter.value) shareUrl.searchParams.set('id', entityFilter.value);
     var checkedBase = layerList.querySelector('input[name="base-layer"]:checked');
     if (checkedBase) shareUrl.searchParams.set('base', checkedBase.nextElementSibling.nextElementSibling.textContent);
