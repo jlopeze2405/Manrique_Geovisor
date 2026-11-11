@@ -334,11 +334,11 @@ async function loadBuildingAttributes(url, encodingUrl) {
       const formulaHeight = floorCount * CONFIG.estimatedHeightPerFloor;
       if (Math.abs(sourceHeight - formulaHeight) > 1e-7) throw new Error("Altura no coincide con numero_pis × 2,10 en el registro " + (index + 1) + ".");
       estimatedCount++;
-      records[index] = { recordId: index + 1, floorCount, basementCount, estimatedHeight: formulaHeight, heightStatus: "estimated", riskCategory: readText("cat_riesgo"), threatCategory: readText("cat_amenza") };
+      records[index] = { recordId: index + 1, cbml: readText("cbml"), floorCount, basementCount, estimatedHeight: formulaHeight, heightStatus: "estimated", riskCategory: readText("cat_riesgo"), threatCategory: readText("cat_amenza") };
     } else {
       if (sourceHeight !== 0) throw new Error("El registro " + (index + 1) + " tiene numero_pis=0 y Altura distinta de cero.");
       zeroCount++;
-      records[index] = { recordId: index + 1, floorCount, basementCount, estimatedHeight: null, heightStatus: "unknown", riskCategory: readText("cat_riesgo"), threatCategory: readText("cat_amenza") };
+      records[index] = { recordId: index + 1, cbml: readText("cbml"), floorCount, basementCount, estimatedHeight: null, heightStatus: "unknown", riskCategory: readText("cat_riesgo"), threatCategory: readText("cat_amenza") };
     }
   }
   return { recordCount, records, estimatedCount, zeroCount, source: url, encoding };
@@ -923,11 +923,11 @@ function setupFeatureSelection(scene, camera, renderer, controls, layers, surfac
   highlight.name = "selected_feature_highlight";
   scene.add(highlight);
   let active = false, pointerStart = null;
-  const layerLabels = { buildings: "Construccion", volumes: "Volumen estimado", parcels: "Lote", risk: "Zona de riesgo", threat: "Zona de amenaza", buffer: "Buffer del area de estudio" };
+  const layerLabels = { buildings: "Construccion", volumes: "Construccion 3D (altura estimada)", parcels: "Lote", risk: "Zona de riesgo", threat: "Zona de amenaza", buffer: "Buffer del area de estudio" };
   const fieldLabels = {
     fid_: "FID", cod_divipo: "Codigo DIVIPOLA", numero_pre: "Numero predial", matricula_: "Matricula", zona: "Zona", condicion_: "Condicion", destinacio: "Destinacion", tipo_predi: "Tipo de predio", shape_area: "Area registrada (m2)", cat_amenza: "Categoria de amenaza", cat_riesgo: "Categoria de riesgo",
     codigo: "Codigo", nombre: "Nombre", descripcio: "Descripcion", tipo_amena: "Tipo de amenaza", categoria_: "Categoria", subcategor: "Subcategoria", fecha_adop: "Fecha de adopcion", fecha_actu: "Fecha de actualizacion", objectid: "ObjectID", categoria: "Categoria", grado_amen: "Grado de amenaza",
-    recordId: "Registro", floorCount: "Numero de pisos", basementCount: "Numero de sotanos", estimatedHeight: "Altura estimada (m)", heightStatus: "Estado de altura", riskCategory: "Categoria de riesgo", threatCategory: "Categoria de amenaza"
+    recordId: "Registro", cbml: "CBML", floorCount: "Numero de pisos", basementCount: "Numero de sotanos", estimatedHeight: "Altura estimada (m)", heightStatus: "Estado de altura", riskCategory: "Categoria de riesgo", threatCategory: "Categoria de amenaza"
   };
   const clearHighlight = () => {
     while (highlight.children.length) {
