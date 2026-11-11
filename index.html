@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="workspace.css">
 </head>
 <body>
   <main class="app-shell">
@@ -55,6 +56,12 @@
           <input id="entity-filter" type="search" placeholder="FID, matrícula, CBML o ID">
         </label>
       </section>
+      <section class="panel-section spatial-query-panel" aria-label="Consulta por área dibujada">
+        <div class="section-heading"><span class="section-icon" aria-hidden="true">⌖</span><div><h2>Consulta por área</h2><p>Filtra entidades con un dibujo</p></div></div>
+        <label class="filter-field">Relación espacial<select id="spatial-relation"><option value="intersects">Interseca el polígono</option><option value="within">Está completamente dentro</option></select></label>
+        <p id="spatial-result" class="stats-note" aria-live="polite">Dibuja un polígono para consultar predios y construcciones.</p>
+        <button class="secondary-action" id="open-spatial-results" type="button" disabled>Ver registros de la consulta</button>
+      </section>
 
       </div>
       <div class="workspace-tab-panel" id="workspace-panel-results" role="tabpanel" aria-labelledby="workspace-tab-results" data-workspace-panel="results" hidden>
@@ -87,9 +94,6 @@
         <button class="secondary-action" id="export-geojson" type="button">Descargar resultados GeoJSON</button>
         <label class="filter-field">CRS de coordenadas de salida<select id="output-crs"><option value="4326">EPSG:4326 · WGS 84</option><option value="3116">EPSG:3116 · MAGNA-SIRGAS / Bogotá</option><option value="9377">EPSG:9377 · MAGNA-SIRGAS 2018 / Origen-Nacional</option></select></label>
         <button class="secondary-action" id="print-map" type="button">Imprimir composición del mapa</button>
-        <label class="filter-field">Relación de consulta espacial<select id="spatial-relation"><option value="intersects">Interseca el polígono</option><option value="within">Está completamente dentro</option></select></label>
-        <p id="spatial-result" class="stats-note" aria-live="polite">Dibuja un polígono para consultar predios y construcciones.</p>
-        <button class="secondary-action" id="open-spatial-results" type="button" disabled>Ver registros de la consulta</button>
       </section>
 
       </div>

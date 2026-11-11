@@ -1,0 +1,10 @@
+.workspace-tabs{position:sticky;top:0;z-index:20;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin:0;padding:10px 12px;border-bottom:1px solid #cbd8e2;background:#edf3f7f2;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.workspace-tab{display:flex;align-items:center;justify-content:center;gap:5px;min-width:0;min-height:38px;padding:7px 4px;border:1px solid transparent;border-radius:8px;background:transparent;color:#526b82;font-size:9px;font-weight:700;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+.workspace-tab span{font-size:14px;color:#0f7180}
+.workspace-tab:hover{background:#ffffffa8;color:#173b4f}
+.workspace-tab.active{border-color:#b9d3dc;background:#fff;color:#0b5363;box-shadow:0 2px 8px #0b2e5910}
+.workspace-tab:focus-visible{outline:2px solid #0f7180;outline-offset:2px}
+.workspace-tab-panels{min-height:0}
+.workspace-tab-panel[hidden]{display:none!important}
+.workspace-tab-panel>.panel-section:first-child{margin-top:8px}
+@media(max-width:620px){.workspace-tabs{top:0;padding:8px 10px}.workspace-tab{min-height:42px;font-size:9px}}
