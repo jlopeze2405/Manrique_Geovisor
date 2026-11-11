@@ -215,13 +215,19 @@ async function loadCategoryAttributes(url, encodingUrl, fieldName, extraFields =
   }
   if (!target || target.type !== "C") throw new Error("No se encontró el campo categórico " + fieldName + ".");
   if (offset !== recordLength) throw new Error("Longitud de campos DBF inconsistente.");
-  const values = new Array(recordCount);
+  const requestedFields = [fieldName, ...extraFields].map(name => fields.find(field => field.name === name.toLowerCase())).filter(Boolean);
+  const values = new Array(recordCount), records = new Array(recordCount);
   for (let i = 0; i < recordCount; i++) {
     const base = headerLength + i * recordLength;
     if (view.getUint8(base) !== 0x20) throw new Error("Registro DBF temático eliminado o inválido.");
-    values[i] = decoder.decode(new Uint8Array(buffer, base + target.offset, target.length)).trim();
+    records[i] = {};
+    for (const field of requestedFields) {
+      const raw = decoder.decode(new Uint8Array(buffer, base + field.offset, field.length)).trim();
+      records[i][field.name] = field.type === "N" || field.type === "F" ? (raw === "" ? null : Number(raw)) : raw;
+    }
+    values[i] = records[i][fieldName.toLowerCase()];
   }
-  return { recordCount, values, fieldName, encoding };
+  return { recordCount, values, records, fieldName, encoding };
 }
 
 async function loadBuildingAttributes(url, encodingUrl) {
