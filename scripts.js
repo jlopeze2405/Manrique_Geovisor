@@ -636,8 +636,8 @@
     }
     map.getContainer().style.cursor = selectionToolActive ? 'crosshair' : '';
     map.getContainer().classList.toggle('selection-active', selectionToolActive);
+    clearFeatureSelection();
     if (selectionToolActive) {
-      clearFeatureSelection();
       selectionMapDraggingBefore = map.dragging.enabled();
       map.dragging.disable();
     } else if (selectionMapDraggingBefore !== null) {
@@ -1390,10 +1390,6 @@
           var properties = feature && feature.properties ? feature.properties : {};
           featureLayer._isParcelLayer = isParcelLayer;
           featureLayer._isConstructionLayer = isConstructionLayer;
-          if (isParcelLayer) {
-            var fidKey = Object.keys(properties).find(function (key) { return key.toLocaleLowerCase('es') === 'fid_'; });
-            if (fidKey && properties[fidKey] != null) featureLayer.bindTooltip('FID: ' + properties[fidKey], { direction: 'top', sticky: true });
-          }
           var content = isParcelLayer ? buildParcelPopup(properties) : (isConstructionLayer ? buildConstructionPopup(properties) : document.createElement('div'));
           if (isParcelLayer || isConstructionLayer) {
             featureLayer.bindPopup(content, { maxWidth: 350, minWidth: 260, className: 'parcel-popup-container' });
@@ -1411,8 +1407,13 @@
           featureLayer._originalFeatureStyle = Object.assign({}, featureLayer.options);
           featureLayer.on('click', function (event) {
             if (activeAction || activeEdit) { if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent); return; }
+            if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent);
+            if (!selectionToolActive) {
+              if (featureLayer.closePopup) featureLayer.closePopup();
+              if (featureLayer.closeTooltip) featureLayer.closeTooltip();
+              return;
+            }
             if (selectionToolActive) {
-              if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent);
               selectFeatureLayer(featureLayer);
               if ((isParcelLayer || isConstructionLayer) && featureLayer.closePopup) featureLayer.closePopup();
               return;
@@ -1592,7 +1593,7 @@
         var popup = document.createElement('div'); var heading = document.createElement('strong'); heading.textContent = feature.properties && feature.properties.name || displayName; popup.appendChild(heading);
         Object.keys(feature.properties || {}).forEach(function (key) { var line = document.createElement('div'); line.textContent = key + ': ' + String(feature.properties[key] == null ? '' : feature.properties[key]); popup.appendChild(line); });
         featureLayer.bindPopup(popup);
-        featureLayer.on('click', function (event) { if (activeAction || activeEdit) { if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent); return; } if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent); var bounds = getLayerBounds(featureLayer); if (bounds) map.fitBounds(bounds, { padding: [36, 36], maxZoom: 17 }); featureLayer.openPopup(); });
+        featureLayer.on('click', function (event) { if (activeAction || activeEdit) { if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent); return; } if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent); if (!selectionToolActive) { featureLayer.closePopup(); if (featureLayer.closeTooltip) featureLayer.closeTooltip(); return; } var bounds = getLayerBounds(featureLayer); if (bounds) map.fitBounds(bounds, { padding: [36, 36], maxZoom: 17 }); featureLayer.openPopup(); });
       }
     });
     group.addLayer(geoLayer); group.featureData = features;
