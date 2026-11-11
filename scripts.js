@@ -1236,10 +1236,10 @@
     appendBuildingDiagnosticAttribute(attributes, 'ID de construcción (fuente)', buildingDiagnosticSourceValue(properties, ['id_constru']));
     appendBuildingDiagnosticAttribute(attributes, 'Número de edificación (fuente)', buildingDiagnosticSourceValue(properties, ['numero_edi']));
     appendBuildingDiagnosticAttribute(attributes, 'Tipo registrado', buildingDiagnosticSourceValue(properties, ['tipo_const']));
-    appendBuildingDiagnosticAttribute(attributes, 'Área construida registrada', buildingDiagnosticSourceValue(properties, ['area_const']));
+    appendBuildingDiagnosticAttribute(attributes, 'Área construida (valor fuente)', buildingDiagnosticSourceValue(properties, ['area_const']));
     appendBuildingDiagnosticAttribute(attributes, 'Pisos registrados', buildingDiagnosticSourceValue(properties, ['numero_pis']));
     appendBuildingDiagnosticAttribute(attributes, 'Sótanos registrados', buildingDiagnosticSourceValue(properties, ['numero_sot']));
-    appendBuildingDiagnosticAttribute(attributes, 'Altura registrada', buildingDiagnosticSourceValue(properties, ['Altura']));
+    appendBuildingDiagnosticAttribute(attributes, 'Altura (valor fuente)', buildingDiagnosticSourceValue(properties, ['Altura']));
     var threat = buildingDiagnosticSourceValue(properties, ['Cat_Amenza', 'grado_amen', 'categoria']);
     var risk = buildingDiagnosticSourceValue(properties, ['Cat_Riesgo', 'riesgo']);
     document.getElementById('building-diagnostic-threat').textContent = threat || 'Sin clasificación en el dato fuente';
@@ -1273,7 +1273,7 @@
       return;
     }
     buildingDiagnosticStatus.textContent = matches.length === 1
-      ? 'Se encontró 1 construcción. Selecciónala para revisar sus atributos registrados.'
+      ? 'Se encontró 1 construcción; se muestra su ficha preliminar.'
       : 'Se encontraron ' + matches.length.toLocaleString('es') + ' construcciones asociadas a este CBML. Selecciona el registro que quieres revisar.';
     matches.forEach(function (feature, matchIndex) {
       var sourceIndex = constructionFilterFeatures.indexOf(feature);
