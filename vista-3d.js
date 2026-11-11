@@ -896,6 +896,110 @@ function setupNavigationButtons(camera, controls) {
   window.addEventListener("keydown", event => { if (event.key === "Home" && !event.altKey && !event.ctrlKey && !event.metaKey) reset(); });
 }
 
+function setupFeatureSelection(scene, camera, renderer, controls, layers, surface) {
+  const canvas = renderer.domElement;
+  const toolButton = document.getElementById("select-feature-tool");
+  const hint = document.getElementById("select-tool-hint");
+  const inspector = document.getElementById("feature-inspector-3d");
+  const title = document.getElementById("feature-inspector-title");
+  const subtitle = document.getElementById("feature-inspector-subtitle");
+  const rows = document.getElementById("feature-inspector-rows");
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+  const highlight = new THREE.Group();
+  highlight.name = "selected_feature_highlight";
+  scene.add(highlight);
+  let active = false, pointerStart = null;
+  const layerLabels = { buildings: "Construccion", volumes: "Volumen estimado", parcels: "Lote", risk: "Zona de riesgo", threat: "Zona de amenaza", buffer: "Buffer del area de estudio" };
+  const fieldLabels = {
+    fid_: "FID", cod_divipo: "Codigo DIVIPOLA", numero_pre: "Numero predial", matricula_: "Matricula", zona: "Zona", condicion_: "Condicion", destinacio: "Destinacion", tipo_predi: "Tipo de predio", shape_area: "Area registrada (m2)", cat_amenza: "Categoria de amenaza", cat_riesgo: "Categoria de riesgo",
+    codigo: "Codigo", nombre: "Nombre", descripcio: "Descripcion", tipo_amena: "Tipo de amenaza", categoria_: "Categoria", subcategor: "Subcategoria", fecha_adop: "Fecha de adopcion", fecha_actu: "Fecha de actualizacion", objectid: "ObjectID", categoria: "Categoria", grado_amen: "Grado de amenaza",
+    recordId: "Registro", floorCount: "Numero de pisos", basementCount: "Numero de sotanos", estimatedHeight: "Altura estimada (m)", heightStatus: "Estado de altura", riskCategory: "Categoria de riesgo", threatCategory: "Categoria de amenaza"
+  };
+  const clearHighlight = () => {
+    while (highlight.children.length) {
+      const child = highlight.children.pop();
+      child.geometry.dispose(); child.material.dispose();
+    }
+  };
+  const clearSelection = () => { clearHighlight(); inspector.hidden = true; rows.textContent = ""; hint.textContent = active ? "Pulsa otra entidad visible para consultar sus atributos." : "Activa la herramienta y pulsa una entidad visible para consultar sus atributos."; };
+  const drawHighlight = feature => {
+    clearHighlight();
+    if (!feature || !Array.isArray(feature.rings)) return;
+    const positions = [];
+    for (const ring of feature.rings) for (let index = 0; index < ring.length; index++) {
+      const a = ring[index], b = ring[(index + 1) % ring.length];
+      const ea = sampleRenderedSurfaceElevation(a.x, a.north, ...surface);
+      const eb = sampleRenderedSurfaceElevation(b.x, b.north, ...surface);
+      if (ea === null || eb === null) continue;
+      positions.push(a.x - surface.originX, (ea - surface.baseElevation) * CONFIG.verticalScale + 1.1, a.north - surface.originNorth,
+        b.x - surface.originX, (eb - surface.baseElevation) * CONFIG.verticalScale + 1.1, b.north - surface.originNorth);
+    }
+    if (!positions.length) return;
+    const geometry = new THREE.BufferGeometry(); geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    const material = new THREE.LineBasicMaterial({ color: 0x00e5ff, depthTest: false, toneMapped: false });
+    highlight.add(new THREE.LineSegments(geometry, material));
+  };
+  const showFeature = (layerConfig, feature) => {
+    clearHighlight(); drawHighlight(feature);
+    title.textContent = layerLabels[layerConfig.key] || "Entidad seleccionada";
+    const identifier = feature.numero_pre || feature.cbml || feature.id || feature.fid_ || feature.objectid || "No disponible";
+    subtitle.textContent = "Identificador: " + identifier + " · " + layerConfig.source;
+    rows.textContent = "";
+    const attributes = { "id": feature.id, ...feature };
+    for (const [key, value] of Object.entries(attributes)) {
+      if (key === "rings" || key === "id" || value == null || typeof value === "object" || String(value).trim() === "") continue;
+      const row = document.createElement("div"); row.className = "feature-inspector-row";
+      const label = document.createElement("span"); label.textContent = fieldLabels[key] || key;
+      const text = document.createElement("strong"); text.textContent = typeof value === "number" ? formatNumber(value, 3) : String(value);
+      row.append(label, text); rows.appendChild(row);
+    }
+    if (!rows.childElementCount) {
+      const row = document.createElement("div"); row.className = "feature-inspector-row"; row.textContent = "El registro no contiene atributos disponibles."; rows.appendChild(row);
+    }
+    inspector.hidden = false;
+    hint.textContent = "Entidad resaltada. Pulsa otra entidad para cambiar la seleccion.";
+  };
+  const onPointerDown = event => { if (event.button !== 0) return; pointerStart = { x: event.clientX, y: event.clientY, id: event.pointerId }; };
+  const onPointerUp = event => {
+    if (!active || !pointerStart || pointerStart.id !== event.pointerId) return;
+    const moved = Math.hypot(event.clientX - pointerStart.x, event.clientY - pointerStart.y);
+    pointerStart = null;
+    if (moved > 5) return;
+    const rect = canvas.getBoundingClientRect();
+    pointer.set((event.clientX - rect.left) / rect.width * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
+    raycaster.setFromCamera(pointer, camera);
+    raycaster.params.Line.threshold = Math.max(1.5, camera.position.distanceTo(controls.target) * 0.006);
+    const candidates = layers.filter(item => item.layer.visible && item.enabled()).flatMap(item =>
+      raycaster.intersectObject(item.layer, true).map(hit => ({ ...hit, item }))
+    ).sort((a, b) => a.distance - b.distance);
+    for (const hit of candidates) {
+      const idAttribute = hit.object.geometry && hit.object.geometry.getAttribute("featureId");
+      if (!idAttribute) continue;
+      const vertexIndex = hit.face ? hit.face.a : (Number.isInteger(hit.index) ? hit.index : -1);
+      if (vertexIndex < 0 || vertexIndex >= idAttribute.count) continue;
+      const featureId = Math.round(idAttribute.getX(vertexIndex));
+      const feature = hit.item.features.get(featureId);
+      if (feature) { showFeature(hit.item, feature); return; }
+    }
+    clearSelection();
+    hint.textContent = "No se detecto una entidad de las capas activadas en ese punto.";
+  };
+  toolButton.addEventListener("click", () => {
+    active = !active;
+    toolButton.setAttribute("aria-pressed", String(active));
+    toolButton.textContent = active ? "Desactivar seleccion" : "Activar seleccion";
+    controls.enabled = !active;
+    canvas.style.cursor = active ? "crosshair" : "grab";
+    hint.textContent = active ? "Pulsa una entidad visible. La camara queda fija mientras seleccionas." : "Activa la herramienta y pulsa una entidad visible para consultar sus atributos.";
+  });
+  canvas.addEventListener("pointerdown", onPointerDown);
+  window.addEventListener("pointerup", onPointerUp);
+  document.getElementById("clear-feature-selection").addEventListener("click", clearSelection);
+  document.getElementById("close-feature-inspector").addEventListener("click", () => { inspector.hidden = true; clearHighlight(); });
+  return { get active() { return active; }, get selectedFeature() { return inspector.hidden ? null : title.textContent; } };
+}
+
 function getDemExtent(width, height, world) {
   const [pixelX, rotationY, rotationX, pixelY, centerX, centerY] = world;
   if (Math.abs(rotationY) > 1e-9 || Math.abs(rotationX) > 1e-9 || pixelX <= 0 || pixelY >= 0) {
