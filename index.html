@@ -80,6 +80,29 @@
         <p class="stats-note">El porcentaje cuenta construcciones que intersectan geométricamente las zonas clasificadas como riesgo. Es una superposición cartográfica; no representa una evaluación predial ni sustituye un estudio técnico.</p>
       </section>
 
+      <section class="panel-section building-diagnostic" aria-labelledby="building-diagnostic-title">
+        <div class="section-heading"><span class="section-icon" aria-hidden="true">⌕</span><div><h2 id="building-diagnostic-title">Diagnóstico individual de construcción</h2><p>Consulta por CBML · borrador</p></div><span class="diagnostic-draft-tag">BORRADOR</span></div>
+        <p class="diagnostic-intro">Busca el CBML exacto de la capa de construcciones. Un mismo CBML puede agrupar varias construcciones; selecciona el registro que quieres revisar.</p>
+        <form id="building-diagnostic-form" class="diagnostic-search-form" novalidate>
+          <label class="filter-field" for="building-diagnostic-cbml">CBML de 11 dígitos
+            <input id="building-diagnostic-cbml" name="cbml" type="text" inputmode="numeric" autocomplete="off" maxlength="11" pattern="[0-9]{11}" placeholder="Escribe los 11 dígitos" aria-describedby="building-diagnostic-status">
+          </label>
+          <div class="diagnostic-actions"><button class="action-button" id="building-diagnostic-search" type="submit">Buscar construcciones</button><button class="secondary-action" id="building-diagnostic-clear" type="button">Limpiar</button></div>
+        </form>
+        <p id="building-diagnostic-status" class="stats-note" role="status" aria-live="polite">La búsqueda estará disponible cuando termine de cargar la capa de construcciones.</p>
+        <div id="building-diagnostic-candidates" class="diagnostic-candidates" aria-label="Construcciones encontradas"></div>
+        <article id="building-diagnostic-record" class="diagnostic-record" aria-live="polite" hidden>
+          <div class="diagnostic-record-heading"><div><h3>Ficha preliminar de construcción</h3><p id="building-diagnostic-record-id"></p></div><button id="building-diagnostic-map" class="secondary-action" type="button">Ver en el mapa</button></div>
+          <div class="diagnostic-attributes" id="building-diagnostic-attributes"></div>
+          <div class="diagnostic-classifications">
+            <section class="diagnostic-classification threat"><h4>Amenaza por movimiento en masa</h4><strong id="building-diagnostic-threat">—</strong><small>Clasificación registrada en la capa fuente</small></section>
+            <section class="diagnostic-classification risk"><h4>Riesgo por movimiento en masa</h4><strong id="building-diagnostic-risk">—</strong><small>Clasificación registrada en la capa fuente</small></section>
+          </div>
+          <p class="diagnostic-limit-note">Este borrador muestra los atributos existentes de la construcción. Aún no calcula área de intersección ni porcentaje afectado, y no constituye un concepto técnico oficial.</p>
+          <button class="secondary-action diagnostic-pdf-placeholder" type="button" disabled title="Disponible en una etapa posterior">Informe PDF · próximamente</button>
+        </article>
+      </section>
+
       <section class="panel-section inspector-panel" id="feature-inspector" aria-label="Detalle de entidad seleccionada" hidden>
         <div class="section-heading"><div><h2 id="inspector-title">Detalle de entidad</h2><p id="inspector-subtitle">Selecciona un predio o construcción</p></div><button id="inspector-close" class="icon-button" type="button" aria-label="Cerrar detalle">×</button></div>
         <div id="inspector-content" class="inspector-content"></div>
