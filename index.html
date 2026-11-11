@@ -23,6 +23,14 @@
 
       <details class="quick-guide panel-section"><summary>Guía rápida · cómo consultar</summary><ol><li>Activa capas de riesgo o catastro en el panel.</li><li>Filtra por categoría, barrio o identificador.</li><li>Selecciona una entidad para revisar sus atributos.</li><li>Comparte la vista o descarga los resultados.</li></ol></details>
 
+      <nav class="workspace-tabs" role="tablist" aria-label="Secciones del geovisor">
+        <button class="workspace-tab active" id="workspace-tab-layers" type="button" role="tab" aria-selected="true" aria-controls="workspace-panel-layers" tabindex="0" data-workspace-tab="layers"><span aria-hidden="true">▤</span> Capas</button>
+        <button class="workspace-tab" id="workspace-tab-query" type="button" role="tab" aria-selected="false" aria-controls="workspace-panel-query" tabindex="-1" data-workspace-tab="query"><span aria-hidden="true">⌕</span> Consultar</button>
+        <button class="workspace-tab" id="workspace-tab-results" type="button" role="tab" aria-selected="false" aria-controls="workspace-panel-results" tabindex="-1" data-workspace-tab="results"><span aria-hidden="true">▥</span> Resultados</button>
+        <button class="workspace-tab" id="workspace-tab-tools" type="button" role="tab" aria-selected="false" aria-controls="workspace-panel-tools" tabindex="-1" data-workspace-tab="tools"><span aria-hidden="true">⌁</span> Herramientas</button>
+      </nav>
+      <div class="workspace-tab-panels">
+      <div class="workspace-tab-panel active" id="workspace-panel-layers" role="tabpanel" aria-labelledby="workspace-tab-layers" data-workspace-panel="layers">
       <section class="panel-section">
         <div class="section-heading"><span class="section-icon">▤</span><div><h2>Capas del mapa</h2><p>Controla lo que ves</p></div></div>
         <div class="layer-list" id="layer-list"></div>
@@ -30,6 +38,8 @@
         <p class="layer-scale-hint">Construcciones: zoom 15–19 · Predios: zoom 16–19</p>
       </section>
 
+      </div>
+      <div class="workspace-tab-panel" id="workspace-panel-query" role="tabpanel" aria-labelledby="workspace-tab-query" data-workspace-panel="query" hidden>
       <section class="panel-section data-tools-panel" aria-labelledby="data-tools-title">
         <div class="section-heading"><span class="section-icon">⌕</span><div><h2 id="data-tools-title">Consulta territorial</h2><p>Filtra predios y construcciones</p></div></div>
         <label class="filter-field">Categoría de riesgo
@@ -46,6 +56,8 @@
         </label>
       </section>
 
+      </div>
+      <div class="workspace-tab-panel" id="workspace-panel-results" role="tabpanel" aria-labelledby="workspace-tab-results" data-workspace-panel="results" hidden>
       <section class="panel-section stats-panel" aria-labelledby="stats-title">
         <div class="section-heading"><span class="section-icon">▥</span><div><h2 id="stats-title">Resumen del área</h2><p id="stats-scope">Área de estudio completa</p></div></div>
         <div class="stats-grid">
@@ -80,6 +92,8 @@
         <button class="secondary-action" id="open-spatial-results" type="button" disabled>Ver registros de la consulta</button>
       </section>
 
+      </div>
+      <div class="workspace-tab-panel" id="workspace-panel-tools" role="tabpanel" aria-labelledby="workspace-tab-tools" data-workspace-panel="tools" hidden>
       <section class="panel-section">
         <div class="section-heading"><span class="section-icon">⌖</span><div><h2>Edición</h2><p>Dibuja sobre el mapa</p></div></div>
         <div class="tool-grid">
@@ -111,6 +125,8 @@
         <div class="rotation-row"><span>Orientación</span><div class="rotation-control"><button id="rotate-left" title="Girar a la izquierda" aria-label="Girar a la izquierda">↶</button><span id="bearing-label">N · 0°</span><button id="rotate-right" title="Girar a la derecha" aria-label="Girar a la derecha">↷</button></div></div>
         <button class="clear-button" id="clear-drawings">Borrar geometrías dibujadas</button>
       </section>
+      </div>
+      </div>
       <footer class="sidebar-footer"><span class="live-dot"></span> VISOR ACTIVO <span class="footer-version">SIG · 01</span></footer>
     </aside>
 
