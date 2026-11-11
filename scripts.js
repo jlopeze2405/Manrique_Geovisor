@@ -2081,6 +2081,7 @@
     updateRiskLegendPanel();
     riskLegendToggle.setAttribute('aria-expanded', String(!riskLegendUserHidden));
     riskLegendToggle.title = riskLegendUserHidden ? 'Mostrar la simbología de capas de riesgo' : 'Ocultar la simbología de capas de riesgo';
+    riskLegendToggle.setAttribute('aria-label', riskLegendUserHidden ? 'Mostrar simbología' : 'Ocultar simbología');
     riskLegendToggle.querySelector('span').textContent = riskLegendUserHidden ? 'MOSTRAR SIMBOLOGÍA' : 'OCULTAR SIMBOLOGÍA';
   });
   function updatePrintComposition() {

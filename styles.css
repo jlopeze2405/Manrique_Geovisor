@@ -138,6 +138,7 @@ html,body{background:#edf2f5;color:#173b4f}.sidebar{background:linear-gradient(1
 /* Control para reducir la carga visual de la leyenda. */
 .legend-toggle{border:0;cursor:pointer;font:inherit;white-space:nowrap}
 .legend-toggle:hover{border-color:#0f7180;background:#e6f1f3;color:#0b5363}
+@media(max-width:620px){.legend-toggle{display:flex!important;align-items:center;gap:6px;padding:8px 9px;font-size:9px}.legend-toggle span{display:none}}
 /* Composición cartográfica para impresión en carta horizontal. */
 .print-rail{display:none}
 @page{size:letter landscape;margin:0}
