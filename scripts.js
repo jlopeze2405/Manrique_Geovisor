@@ -635,6 +635,7 @@
       button.querySelector('span').textContent = selectionToolActive ? 'CANCELAR SELECCIÓN' : 'SELECCIONAR ENTIDAD';
     }
     map.getContainer().style.cursor = selectionToolActive ? 'crosshair' : '';
+    map.getContainer().classList.toggle('selection-active', selectionToolActive);
     if (selectionToolActive) {
       clearFeatureSelection();
       selectionMapDraggingBefore = map.dragging.enabled();
@@ -1416,8 +1417,6 @@
               if ((isParcelLayer || isConstructionLayer) && featureLayer.closePopup) featureLayer.closePopup();
               return;
             }
-            selectFeatureLayer(featureLayer);
-            if (activeAction && featureLayer.closePopup) featureLayer.closePopup();
           });
           feature._leafletLayer = featureLayer;
           if (isBoundary) {

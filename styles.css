@@ -139,6 +139,7 @@ html,body{background:#edf2f5;color:#173b4f}.sidebar{background:linear-gradient(1
 .legend-toggle,.selection-toggle{display:flex!important;align-items:center;gap:6px;padding:9px 12px;border:1px solid #0f718044;border-radius:9px;background:#ffffffed;color:#0f7180;font:800 10px var(--sans);white-space:nowrap;box-shadow:0 5px 20px #0b2e5918;cursor:pointer;pointer-events:auto;transition:background .15s,border-color .15s,transform .15s}
 .legend-toggle:hover,.selection-toggle:hover{border-color:#0f7180;background:#e8f4f4;color:#0b5363;transform:translateY(-1px)}
 .selection-toggle.active{border-color:#0f7180;background:#0f7180;color:#fff}.selection-toggle.active span{color:#fff}
+.selection-active .leaflet-interactive{cursor:crosshair!important}
 @media(max-width:620px){.legend-toggle,.selection-toggle{padding:8px 9px;font-size:9px}.legend-toggle span,.selection-toggle span{display:none}}
 /* Composición cartográfica para impresión en carta horizontal. */
 .print-rail{display:none}
