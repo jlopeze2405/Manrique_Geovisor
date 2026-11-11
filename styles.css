@@ -197,7 +197,7 @@ html,body{background:#edf2f5;color:#173b4f}.sidebar{background:linear-gradient(1
 #csv-import-dialog form{display:grid;gap:5px;justify-content:stretch;padding:18px}#csv-import-dialog .dialog-close{position:absolute;top:10px;right:12px}.csv-import-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}.csv-import-actions button{padding:8px 11px;border:1px solid #c5d7e8;border-radius:7px;background:#f4f8fc;color:#173b5e;font:700 10px var(--sans);cursor:pointer}.csv-import-actions button:last-child{border-color:#0f7180;background:#0f7180;color:white}.local-layers{margin-top:12px;padding-top:10px;border-top:1px solid #d5e0e8}.local-layers h3{margin:0;color:#173b4f;font-size:10px}.local-layers .secondary-action{margin-top:7px}
 
 /* Cabecera compacta del visor */
-.brand{display:flex!important;flex-direction:row!important;align-items:center!important;gap:12px!important;min-height:0!important;height:auto!important;padding:10px 14px!important}
+.brand{display:flex!important;flex:0 0 auto!important;flex-direction:row!important;align-items:center!important;gap:12px!important;min-height:68px!important;height:auto!important;padding:10px 14px!important}
 .brand-institution-logo{display:block!important;width:48px!important;height:48px!important;max-width:48px!important;max-height:48px!important;flex:0 0 48px!important;object-fit:contain!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}
 .brand-copy{min-width:0!important;max-width:100%}
 .brand h1{margin:2px 0!important;color:#0b5363!important;font-size:16px!important;letter-spacing:.015em!important;line-height:1.1!important;overflow-wrap:anywhere}
