@@ -447,9 +447,10 @@ function buildingPolygonParts(feature) {
 }
 
 function addPolygonOverlay(scene, source, categoryValues, kind, values, mask, width, height, extent, originX, originNorth, baseElevation) {
-  const positions = [], colors = [], indices = [], outlines = [], outlineColors = [], counts = {};
+  const positions = [], colors = [], indices = [], outlines = [], outlineColors = [], featureIds = [], counts = {};
   const maxTriangleEdge = kind === "buffer" ? 5 : 8;
   let skippedTriangles = 0;
+  let currentFeatureId = 0;
   const pushDrapedTriangle = (points, color, lift) => {
     const ground = points.map(point => sampleRenderedSurfaceElevation(point.x, point.north, values, mask, width, height, extent));
     if (ground.some(value => value === null)) { skippedTriangles++; return; }
@@ -457,10 +458,12 @@ function addPolygonOverlay(scene, source, categoryValues, kind, values, mask, wi
     for (let vertex = 0; vertex < 3; vertex++) {
       positions.push(points[vertex].x - originX, (ground[vertex] - baseElevation) * CONFIG.verticalScale + lift, points[vertex].north - originNorth);
       colors.push(color.r, color.g, color.b);
+      featureIds.push(currentFeatureId);
     }
     indices.push(first, first + 1, first + 2);
   };
   for (const feature of source.features) {
+    currentFeatureId = feature.id;
     const symbol = categoryValues ? (kind === "risk" ? riskSymbol(categoryValues.values[feature.id - 1]) : threatSymbol(categoryValues.values[feature.id - 1])) : null;
     const color = symbol ? new THREE.Color(symbol.hex) : (kind === "buffer" ? new THREE.Color(0xf5b335) : new THREE.Color(0x78879a));
     if (symbol) counts[symbol.key] = (counts[symbol.key] || 0) + 1;
@@ -495,12 +498,12 @@ function addPolygonOverlay(scene, source, categoryValues, kind, values, mask, wi
   }
   const layer = new THREE.Group(); layer.name = kind + "_polygon_layer";
   if (positions.length) {
-    const geometry = new THREE.BufferGeometry(); geometry.setAttribute("position",new THREE.Float32BufferAttribute(positions,3)); geometry.setAttribute("color",new THREE.Float32BufferAttribute(colors,3)); geometry.setIndex(indices); geometry.computeBoundingSphere();
+    const geometry = new THREE.BufferGeometry(); geometry.setAttribute("position",new THREE.Float32BufferAttribute(positions,3)); geometry.setAttribute("color",new THREE.Float32BufferAttribute(colors,3)); geometry.setAttribute("featureId",new THREE.Float32BufferAttribute(featureIds,1)); geometry.setIndex(indices); geometry.computeBoundingSphere();
     const mesh = new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide,transparent:true,opacity:kind === "risk" ? 0.42 : (kind === "buffer" ? 0.12 : 0.2),depthWrite:false,depthTest:true,toneMapped:false,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1}));
     mesh.name = kind + "_fills"; layer.add(mesh);
   }
   if (outlines.length) { const geometry=new THREE.BufferGeometry(); geometry.setAttribute("position",new THREE.Float32BufferAttribute(outlines,3)); geometry.setAttribute("color",new THREE.Float32BufferAttribute(outlineColors,3)); geometry.computeBoundingSphere(); layer.add(new THREE.LineSegments(geometry,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:1,depthTest:true,toneMapped:false}))); }
-  layer.userData={featureCount:source.features.length,sourceRecordCount:source.recordCount,categoryCounts:counts,vertexCount:positions.length/3,triangleCount:indices.length/3,skippedTriangles,drawCalls:(positions.length?1:0)+(outlines.length?1:0),source:kind === "risk" ? CONFIG.riskUrl : kind === "threat" ? CONFIG.threatUrl : (kind === "buffer" ? CONFIG.bufferUrl : CONFIG.parcelsUrl),crs:"EPSG:9377",dbfField:categoryValues && categoryValues.fieldName};
+  layer.userData={featureCount:source.features.length,sourceRecordCount:source.recordCount,categoryCounts:counts,features:source.features,vertexCount:positions.length/3,triangleCount:indices.length/3,skippedTriangles,drawCalls:(positions.length?1:0)+(outlines.length?1:0),source:kind === "risk" ? CONFIG.riskUrl : kind === "threat" ? CONFIG.threatUrl : (kind === "buffer" ? CONFIG.bufferUrl : CONFIG.parcelsUrl),crs:"EPSG:9377",dbfField:categoryValues && categoryValues.fieldName};
   scene.add(layer); return layer;
 }
 
