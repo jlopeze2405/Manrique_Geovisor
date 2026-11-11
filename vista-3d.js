@@ -1436,17 +1436,18 @@ async function main() {
     throw new Error("La GPU admite texturas de hasta " + maxTextureSize + " px; se requieren al menos 1024 px.");
   }
   setStatus("Leyendo manifiesto y georreferencia del DEM…");
-  const [manifest, world, tiff, buildingSource, buildingAttributes, parcelSource, riskSource, riskAttributes, threatSource, threatAttributes, bufferSource] = await Promise.all([
+  const [manifest, world, tiff, buildingSource, buildingAttributes, parcelSource, parcelAttributes, riskSource, riskAttributes, threatSource, threatAttributes, bufferSource] = await Promise.all([
     loadJson(CONFIG.manifestUrl).catch(error => { throw new Error("Fallo al cargar el manifiesto de ortofotos: " + error.message); }),
     loadWorldFile(CONFIG.worldFileUrl).catch(error => { throw new Error("Fallo al cargar la georreferencia del DEM: " + error.message); }),
     loadDem(CONFIG.demUrl).catch(error => { throw new Error("Fallo al cargar el DEM " + CONFIG.demUrl + ": " + (error && error.message ? error.message : error)); }),
     loadBuildingFootprints(CONFIG.buildingsUrl, CONFIG.buildingsIndexUrl, CONFIG.buildingsProjectionUrl).catch(error => { throw new Error("Fallo al cargar geometrías de construcciones: " + (error && error.message ? error.message : error)); }),
     loadBuildingAttributes(CONFIG.buildingsAttributesUrl, CONFIG.buildingsEncodingUrl).catch(error => { throw new Error("Fallo al cargar atributos de construcciones: " + (error && error.message ? error.message : error)); }),
     loadBuildingFootprints(CONFIG.parcelsUrl, CONFIG.parcelsIndexUrl, CONFIG.parcelsProjectionUrl).catch(error => { throw new Error("Fallo al cargar geometrías de lotes: " + error.message); }),
+    loadParcelAttributes(CONFIG.parcelsAttributesUrl, CONFIG.parcelsEncodingUrl).catch(error => { throw new Error("Fallo al cargar atributos de lotes: " + error.message); }),
     loadBuildingFootprints(CONFIG.riskUrl, CONFIG.riskIndexUrl, CONFIG.riskProjectionUrl).catch(error => { throw new Error("Fallo al cargar geometrías de riesgo: " + error.message); }),
-    loadCategoryAttributes(CONFIG.riskAttributesUrl, CONFIG.riskEncodingUrl, "riesgo").catch(error => { throw new Error("Fallo al cargar categorías de riesgo: " + error.message); }),
+    loadCategoryAttributes(CONFIG.riskAttributesUrl, CONFIG.riskEncodingUrl, "riesgo", ["codigo", "nombre", "descripcio", "tipo_amena", "categoria_", "subcategor", "fecha_adop", "fecha_actu", "shape_area"]).catch(error => { throw new Error("Fallo al cargar categorías de riesgo: " + error.message); }),
     loadBuildingFootprints(CONFIG.threatUrl, CONFIG.threatIndexUrl, CONFIG.threatProjectionUrl).catch(error => { throw new Error("Fallo al cargar geometrías de amenaza: " + error.message); }),
-    loadCategoryAttributes(CONFIG.threatAttributesUrl, CONFIG.threatEncodingUrl, "grado_amen").catch(error => { throw new Error("Fallo al cargar categorías de amenaza: " + error.message); }),
+    loadCategoryAttributes(CONFIG.threatAttributesUrl, CONFIG.threatEncodingUrl, "grado_amen", ["objectid", "codigo", "categoria", "categoria_", "subcategor", "fecha_adop", "fecha_actu"]).catch(error => { throw new Error("Fallo al cargar categorías de amenaza: " + error.message); }),
     loadBuildingFootprints(CONFIG.bufferUrl, CONFIG.bufferIndexUrl, CONFIG.bufferProjectionUrl).catch(error => { throw new Error("Fallo al cargar el buffer del area de estudio: " + error.message); }),
   ]);
   if (buildingSource.recordCount !== 3308 || buildingSource.features.length !== 3308 || buildingAttributes.recordCount !== buildingSource.recordCount) {
