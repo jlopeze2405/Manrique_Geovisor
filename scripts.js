@@ -564,6 +564,8 @@
   var attributePanel = document.getElementById('attribute-table-panel');
 
   var selectedFeatureLayer = null;
+  var selectionToolActive = false;
+  var selectionMapDraggingBefore = null;
   function inspectorValue(label, value, host) {
     if (value == null || String(value).trim() === '') return;
     var row = document.createElement('div'); row.className = 'inspector-row';
@@ -612,6 +614,34 @@
       layer.setStyle({ color: '#1976d2', weight: 4, opacity: 1, fillColor: '#1976d2', fillOpacity: 0, radius: 8 });
     }
     if (attributePanel && !attributePanel.hidden) renderAttributeTable();
+  }
+
+  function clearFeatureSelection() {
+    if (selectedFeatureLayer && selectedFeatureLayer._originalFeatureStyle && selectedFeatureLayer.setStyle) selectedFeatureLayer.setStyle(selectedFeatureLayer._originalFeatureStyle);
+    selectedFeatureLayer = null; selectedInspectorLayer = null; attributeFocusedFeature = null;
+    var inspector = document.getElementById('feature-inspector');
+    if (inspector) inspector.hidden = true;
+    if (attributePanel && !attributePanel.hidden) renderAttributeTable();
+  }
+
+  function setSelectionToolActive(active) {
+    selectionToolActive = !!active;
+    var button = document.getElementById('toggle-feature-selection');
+    if (button) {
+      button.setAttribute('aria-pressed', String(selectionToolActive));
+      button.classList.toggle('active', selectionToolActive);
+      button.title = selectionToolActive ? 'Desactivar la selección de entidades' : 'Activar la selección de entidades';
+      button.setAttribute('aria-label', button.title);
+      button.querySelector('span').textContent = selectionToolActive ? 'CANCELAR SELECCIÓN' : 'SELECCIONAR ENTIDAD';
+    }
+    map.getContainer().style.cursor = selectionToolActive ? 'crosshair' : '';
+    if (selectionToolActive) {
+      selectionMapDraggingBefore = map.dragging.enabled();
+      map.dragging.disable();
+    } else if (selectionMapDraggingBefore !== null) {
+      if (selectionMapDraggingBefore) map.dragging.enable(); else map.dragging.disable();
+      selectionMapDraggingBefore = null;
+    }
   }
 
   function neighborhoodForFeature(feature) {
@@ -1379,6 +1409,12 @@
           featureLayer._originalFeatureStyle = Object.assign({}, featureLayer.options);
           featureLayer.on('click', function (event) {
             if (activeAction || activeEdit) { if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent); return; }
+            if (selectionToolActive) {
+              if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent);
+              selectFeatureLayer(featureLayer);
+              if ((isParcelLayer || isConstructionLayer) && featureLayer.closePopup) featureLayer.closePopup();
+              return;
+            }
             selectFeatureLayer(featureLayer);
             if (activeAction && featureLayer.closePopup) featureLayer.closePopup();
           });
@@ -1866,6 +1902,7 @@
   }
 
   function startAction(kind, type) {
+    if (selectionToolActive) setSelectionToolActive(false);
     if (activeEdit) finishDrawingEdit(true);
     endAction('Haz clic en el mapa para agregar vértices.');
     activeAction = { kind: kind, type: type };
@@ -2123,6 +2160,7 @@
 
   map.on('click', function (event) {
     if (activeEdit) return;
+    if (selectionToolActive && !activeAction) { clearFeatureSelection(); return; }
     if (!activeAction) return;
     if (activeAction.kind === 'draw' && activeAction.type === 'marker') {
       vertices = [event.latlng];
