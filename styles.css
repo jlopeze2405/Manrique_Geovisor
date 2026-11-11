@@ -148,8 +148,8 @@ html,body{background:#edf2f5;color:#173b4f}.sidebar{background:linear-gradient(1
   .print-heading strong{font-size:15px;letter-spacing:.02em}.print-heading span{color:#526b82;font-size:9px}
   .north-arrow{top:0.2in;right:29%;width:34px;height:42px}
   .print-rail{position:absolute;z-index:1001;top:0;right:0;bottom:0;display:flex;width:26%;box-sizing:border-box;flex-direction:column;gap:9px;padding:0.18in;border-left:1px solid #cbd5df;background:#fff;color:#173b4f;font:9px var(--sans)}
-  .print-brand{display:flex;align-items:center;gap:9px;min-height:0.55in;padding:6px;border:1px solid #d7e0e7;border-radius:4px;font-size:9px;line-height:1.25}
-  .print-brand strong{font-size:10px}.print-brand-mark{display:grid;place-items:center;width:43px;height:43px;flex:none;border-radius:50%;background:#f6a800;color:#fff;font-size:10px;font-weight:800;letter-spacing:.04em}
+  .print-brand{display:flex;align-items:center;justify-content:center;min-height:0.55in;padding:6px;border:1px solid #d7e0e7;border-radius:4px;background:#fff}
+  .print-logo{display:block;width:100%;max-height:0.65in;object-fit:contain}
   .print-title{margin:0;padding:9px 8px;border:1px solid #64798a;text-align:center;text-transform:uppercase;font-size:12px;letter-spacing:.03em}
   .print-rail section{padding:8px;border:1px solid #d7e0e7;border-radius:4px}
   .print-rail h2{margin:0 0 7px;color:#173b4f;font-size:12px;text-transform:uppercase;letter-spacing:.035em}
