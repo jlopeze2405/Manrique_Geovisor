@@ -12,7 +12,7 @@
   var manriqueSouthWest = webMercatorToLatLng(-8410971.368524, 698894.894891);
   var manriqueNorthEast = webMercatorToLatLng(-8407927.578103, 700845.937304);
   var manriqueImageBounds = L.latLngBounds(manriqueSouthWest, manriqueNorthEast);
-  var map = L.map('map', { zoomControl: false, rotate: true, bearing: 0, rotateControl: false, dragRotate: true, shiftKeyRotate: true, touchRotate: true, doubleClickZoom: true });
+  var map = L.map('map', { zoomControl: false, doubleClickZoom: true });
   map.fitBounds(manriqueImageBounds, { padding: [30, 30], maxZoom: 13, animate: false });
   initialCenter = map.getCenter(); initialZoom = map.getZoom();
   var userChangedView = false;
@@ -72,7 +72,6 @@
   var previewLine = null;
   var previewShape = null;
   var vertexMarkers = [];
-  var bearing = 0;
   var layerList = document.getElementById('layer-list');
   var activeLayerLegend = document.getElementById('active-layer-legend');
   function renderActiveLayerLegend() {
@@ -2173,6 +2172,17 @@
     riskLegendToggle.setAttribute('aria-label', riskLegendUserHidden ? 'Mostrar simbología' : 'Ocultar simbología');
     riskLegendToggle.querySelector('span').textContent = riskLegendUserHidden ? 'MOSTRAR SIMBOLOGÍA' : 'OCULTAR SIMBOLOGÍA';
   });
+  var uvaMarkerToggle = document.getElementById('toggle-uva-marker');
+  var uvaMarkerHidden = false;
+  uvaMarkerToggle.addEventListener('click', function () {
+    uvaMarkerHidden = !uvaMarkerHidden;
+    if (uvaMarkerHidden) map.removeLayer(uvaMarker);
+    else uvaMarker.addTo(map);
+    uvaMarkerToggle.setAttribute('aria-expanded', String(!uvaMarkerHidden));
+    uvaMarkerToggle.title = uvaMarkerHidden ? 'Mostrar marcador UVA La Armonía' : 'Ocultar marcador UVA La Armonía';
+    uvaMarkerToggle.setAttribute('aria-label', uvaMarkerToggle.title);
+    uvaMarkerToggle.querySelector('span').textContent = uvaMarkerHidden ? 'MOSTRAR UVA' : 'OCULTAR UVA';
+  });
   function updatePrintComposition() {
     var rail = document.querySelector('.print-rail');
     if (!rail) return;
@@ -2268,42 +2278,9 @@
       var action = button.dataset.mapNav;
       if (action === 'zoom-in') map.zoomIn();
       else if (action === 'zoom-out') map.zoomOut();
-      else if (action === 'home') { map.setView(initialCenter, initialZoom); setBearing(0); }
-      else if (action === 'north') setBearing(0);
-      else if (action === 'rotate-left') setBearing(bearing - 15);
-      else if (action === 'rotate-right') setBearing(bearing + 15);
+      else if (action === 'home') map.setView(initialCenter, initialZoom);
     });
   });
-  function syncBearingIndicator() {
-    if (typeof map.getBearing === 'function') bearing = ((map.getBearing() % 360) + 360) % 360;
-    keepThematicLayersUpright();
-    var compassArrow = document.querySelector('.map-compass-arrow');
-    if (compassArrow) compassArrow.style.transform = 'rotate(' + (-bearing) + 'deg)';
-  }
-
-  function keepThematicLayersUpright() {
-    var mapSize = map.getSize();
-    var centerX = mapSize.x / 2;
-    var centerY = mapSize.y / 2;
-    // Leaflet Rotate rotates overlayPane; custom and marker panes are outside its wrapper.
-    var overlayPane = map.getPane('overlayPane');
-    if (overlayPane) {
-      overlayPane.style.transformOrigin = centerX + 'px ' + centerY + 'px';
-      overlayPane.style.transform = bearing ? 'rotate(' + (-bearing) + 'deg)' : '';
-    }
-  }
-
-  function setBearing(value) {
-    if (typeof map.setBearing !== 'function') {
-      console.error('No se cargó el complemento de rotación de Leaflet.');
-      return;
-    }
-    bearing = ((value % 360) + 360) % 360;
-    map.setBearing(bearing);
-    syncBearingIndicator();
-  }
-  map.on('rotate resize', syncBearingIndicator);
-  if (sharedViewRequested) setBearing(Number(sharedViewParams.get('n')) || 0);
   document.getElementById('share-view').addEventListener('click', async function () {
     var shareUrl = new URL(window.location.href);
     shareUrl.search = '';
@@ -2311,7 +2288,6 @@
     shareUrl.searchParams.set('lat', map.getCenter().lat.toFixed(6));
     shareUrl.searchParams.set('lng', map.getCenter().lng.toFixed(6));
     shareUrl.searchParams.set('z', map.getZoom().toFixed(2));
-    shareUrl.searchParams.set('n', String(Math.round(bearing)));
     if (riskFilter) shareUrl.searchParams.set('riesgo', riskFilter.value);
     if (neighborhoodFilter) shareUrl.searchParams.set('barrio', neighborhoodFilter.value);
     if (landuseFilter && landuseFilter.value !== 'all') shareUrl.searchParams.set('uso', landuseFilter.value);
@@ -2323,7 +2299,7 @@
       return checkbox && checkbox.checked;
     }).map(function (entry) { return entry.querySelector('.layer-item label').textContent; }).filter(function (name) { return name.indexOf('[Temporal] ') !== 0; });
     if (visibleNames.length) shareUrl.searchParams.set('capas', visibleNames.join('|'));
-    try { await navigator.clipboard.writeText(shareUrl.href); document.getElementById('share-view-status').textContent = 'Enlace copiado con encuadre, orientación, capas permanentes y filtros. Las capas temporales y dibujos de esta sesión no se incluyen.'; }
+    try { await navigator.clipboard.writeText(shareUrl.href); document.getElementById('share-view-status').textContent = 'Enlace copiado con encuadre, capas permanentes y filtros. Las capas temporales y dibujos de esta sesión no se incluyen.'; }
     catch (error) { document.getElementById('share-view-status').textContent = 'No se pudo copiar automáticamente. Mantén pulsado y copia este enlace: ' + shareUrl.href; }
   });
   document.getElementById('clear-drawings').addEventListener('click', function () {
