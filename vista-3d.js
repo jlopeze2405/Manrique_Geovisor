@@ -230,6 +230,38 @@ async function loadCategoryAttributes(url, encodingUrl, fieldName, extraFields =
   return { recordCount, values, records, fieldName, encoding };
 }
 
+// Keep parcel inspection limited to cadastral/risk fields; owner identity and valuation fields are not exposed.
+async function loadParcelAttributes(url, encodingUrl) {
+  const [dbfResponse, encodingResponse] = await Promise.all([fetch(url, { cache: "no-store" }), fetch(encodingUrl, { cache: "no-store" })]);
+  if (!dbfResponse.ok || !encodingResponse.ok) throw new Error("No se pudieron leer los atributos catastrales de lotes.");
+  const encoding = (await encodingResponse.text()).trim();
+  if (!/^UTF-?8$/i.test(encoding)) throw new Error("Codificacion DBF de lotes no compatible: " + encoding);
+  const buffer = await dbfResponse.arrayBuffer(), view = new DataView(buffer), decoder = new TextDecoder("utf-8", { fatal: true });
+  const recordCount = view.getUint32(4, true), headerLength = view.getUint16(8, true), recordLength = view.getUint16(10, true), fields = [];
+  if (headerLength < 33 || headerLength + recordCount * recordLength > buffer.byteLength) throw new Error("DBF de lotes incompleto.");
+  let at = 32, offset = 1;
+  while (at < headerLength - 1 && view.getUint8(at) !== 0x0d) {
+    const bytes = new Uint8Array(buffer, at, 11), end = bytes.indexOf(0), name = decoder.decode(end < 0 ? bytes : bytes.subarray(0, end)).trim().toLowerCase();
+    const field = { name, type: String.fromCharCode(view.getUint8(at + 11)), length: view.getUint8(at + 16), offset };
+    fields.push(field); offset += field.length; at += 32;
+  }
+  if (offset !== recordLength) throw new Error("Longitud de campos DBF de lotes inconsistente.");
+  const safeNames = ["fid_", "cod_divipo", "numero_pre", "matricula_", "zona", "condicion_", "destinacio", "tipo_predi", "shape_area", "cat_amenza", "cat_riesgo"];
+  const safeFields = fields.filter(field => safeNames.includes(field.name));
+  const records = new Array(recordCount);
+  for (let i = 0; i < recordCount; i++) {
+    const base = headerLength + i * recordLength;
+    if (view.getUint8(base) !== 0x20) throw new Error("Registro DBF de lote eliminado o invalido.");
+    const record = {};
+    for (const field of safeFields) {
+      const raw = decoder.decode(new Uint8Array(buffer, base + field.offset, field.length)).trim();
+      record[field.name] = field.type === "N" || field.type === "F" ? (raw === "" ? null : Number(raw)) : raw;
+    }
+    records[i] = record;
+  }
+  return { recordCount, records, encoding };
+}
+
 async function loadBuildingAttributes(url, encodingUrl) {
   const [dbfResponse, encodingResponse] = await Promise.all([
     fetch(url, { cache: "no-store" }), fetch(encodingUrl, { cache: "no-store" })
