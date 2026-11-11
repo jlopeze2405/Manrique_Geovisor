@@ -14,6 +14,8 @@ const CONFIG = Object.freeze({
   parcelsUrl: "data/Predios/Predios_Influencia.shp",
   parcelsIndexUrl: "data/Predios/Predios_Influencia.shx",
   parcelsProjectionUrl: "data/Predios/Predios_Influencia.prj",
+  parcelsAttributesUrl: "data/Predios/Predios_Influencia.dbf",
+  parcelsEncodingUrl: "data/Predios/Predios_Influencia.cpg",
   riskUrl: "data/RIESGO_MOV_MASA/RIESGO_MOV_MASA.shp",
   riskIndexUrl: "data/RIESGO_MOV_MASA/RIESGO_MOV_MASA.shx",
   riskAttributesUrl: "data/RIESGO_MOV_MASA/RIESGO_MOV_MASA.dbf",
@@ -196,7 +198,7 @@ async function loadBuildingFootprints(url, indexUrl, projectionUrl) {
 }
 
 // Reads one thematic category field only; parcel owner DBFs are never requested.
-async function loadCategoryAttributes(url, encodingUrl, fieldName) {
+async function loadCategoryAttributes(url, encodingUrl, fieldName, extraFields = []) {
   const [dbfResponse, encodingResponse] = await Promise.all([fetch(url, { cache: "no-store" }), fetch(encodingUrl, { cache: "no-store" })]);
   if (!dbfResponse.ok || !encodingResponse.ok) throw new Error("No se pudo leer DBF/CPG de " + fieldName + ".");
   const encoding = (await encodingResponse.text()).trim();
