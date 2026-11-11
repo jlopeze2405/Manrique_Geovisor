@@ -1332,6 +1332,15 @@ function createPrintSnapshot(scene, camera, orbitControls) {
 }
 
 function updatePrint3DComposition() {
+  const camera = window.__terrain3d.camera;
+  camera.updateMatrixWorld();
+  const northDirection = new THREE.Vector3(0, 0, -1).transformDirection(camera.matrixWorldInverse);
+  const northAngle = Math.atan2(northDirection.x, northDirection.y) * 180 / Math.PI;
+  const printCardinals = document.getElementById("print-3d-cardinals");
+  printCardinals.style.transform = "rotate(" + northAngle + "deg)";
+  for (const label of printCardinals.children) label.style.transform = "rotate(" + (-northAngle) + "deg)";
+  document.getElementById("print-3d-needle").style.transform = "translate(-50%,-50%) rotate(" + northAngle + "deg)";
+
   const layerList = document.getElementById("print-3d-layers");
   layerList.replaceChildren();
   const activeLayers = [...document.querySelectorAll(".layer-toggle input:checked")];
