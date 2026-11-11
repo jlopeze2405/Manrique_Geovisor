@@ -1458,9 +1458,11 @@ async function main() {
     if (!attributes || attributes.recordId !== feature.id) throw new Error("No se pudo relacionar el registro geométrico " + feature.id + " con su fila DBF.");
     Object.assign(feature, attributes);
   }
-  if (parcelSource.recordCount !== 1540 || parcelSource.features.length !== 1540) throw new Error("La capa de lotes no contiene los 1.540 polígonos esperados.");
+  if (parcelSource.recordCount !== 1540 || parcelSource.features.length !== 1540 || parcelAttributes.recordCount !== parcelSource.recordCount) throw new Error("La capa de lotes no contiene los 1.540 polígonos y filas DBF esperados.");
+  for (let index = 0; index < parcelSource.features.length; index++) Object.assign(parcelSource.features[index], parcelAttributes.records[index]);
   for (const [name, source, attributes, expected] of [["riesgo", riskSource, riskAttributes, 19], ["amenaza", threatSource, threatAttributes, 9]]) {
     if (source.recordCount !== expected || source.features.length !== expected || attributes.recordCount !== expected) throw new Error("SHP/SHX/DBF de " + name + " no coinciden con los " + expected + " registros esperados.");
+    for (let index = 0; index < source.features.length; index++) Object.assign(source.features[index], attributes.records[index]);
   }
   if (buildingAttributes.estimatedCount !== 3268 || buildingAttributes.zeroCount !== 40) {
     throw new Error("La auditoría DBF encontró " + buildingAttributes.estimatedCount + " filas con pisos y " + buildingAttributes.zeroCount + " filas sin pisos; se esperaban 3.268 y 40.");
