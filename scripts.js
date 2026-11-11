@@ -36,6 +36,11 @@
   map.getPane('constructionPane').style.zIndex = 460;
   map.createPane('landmarkPane');
   map.getPane('landmarkPane').style.zIndex = 640;
+  map.createPane('printGridPane');
+  map.getPane('printGridPane').style.zIndex = 625;
+  map.createPane('printGridLabelPane');
+  map.getPane('printGridLabelPane').style.zIndex = 680;
+  map.getPane('printGridLabelPane').style.pointerEvents = 'none';
   map.on('dragstart zoomstart', function () { userChangedView = true; });
   var imagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
     maxZoom: 19,
@@ -2203,9 +2208,44 @@
     var attribution = map.getContainer().querySelector('.leaflet-control-attribution');
     rail.querySelector('.print-attribution').textContent = attribution ? attribution.textContent.replace(/\s+/g, ' ').trim() : 'Fuentes visibles en el mapa.';
   }
+  var printGridLayer = L.layerGroup();
+  function niceGridStep(span) {
+    var rawStep = span / 5;
+    var power = Math.pow(10, Math.floor(Math.log10(rawStep)));
+    var normalized = rawStep / power;
+    return (normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10) * power;
+  }
+  function formatGridCoordinate(value, isLatitude) {
+    return Math.abs(value).toFixed(4) + '° ' + (isLatitude ? (value >= 0 ? 'N' : 'S') : (value >= 0 ? 'E' : 'O'));
+  }
+  function buildPrintGrid() {
+    printGridLayer.clearLayers();
+    var bounds = map.getBounds();
+    var south = bounds.getSouth(); var north = bounds.getNorth();
+    var west = bounds.getWest(); var east = bounds.getEast();
+    var latStep = niceGridStep(north - south);
+    var lngStep = niceGridStep(east - west);
+    var latStart = Math.ceil(south / latStep) * latStep;
+    var lngStart = Math.ceil(west / lngStep) * lngStep;
+    var latInset = (north - south) * 0.018;
+    var lngInset = (east - west) * 0.018;
+    for (var latitude = latStart; latitude <= north && latitude <= south + latStep * 20; latitude += latStep) {
+      printGridLayer.addLayer(L.polyline([[latitude, west], [latitude, east]], { pane: 'printGridPane', className: 'print-grid-line', color: '#173b4f', weight: 1, opacity: 0.55, dashArray: '5 5', interactive: false }));
+      printGridLayer.addLayer(L.marker([latitude + Math.min(latInset, latStep * 0.12), west + lngInset], { pane: 'printGridLabelPane', interactive: false, keyboard: false, icon: L.divIcon({ className: 'print-grid-label', html: formatGridCoordinate(latitude, true), iconSize: [58, 13], iconAnchor: [0, 0] }) }));
+    }
+    for (var longitude = lngStart; longitude <= east && longitude <= west + lngStep * 20; longitude += lngStep) {
+      printGridLayer.addLayer(L.polyline([[south, longitude], [north, longitude]], { pane: 'printGridPane', className: 'print-grid-line', color: '#173b4f', weight: 1, opacity: 0.55, dashArray: '5 5', interactive: false }));
+      printGridLayer.addLayer(L.marker([south + latInset, longitude + Math.min(lngInset, lngStep * 0.12)], { pane: 'printGridLabelPane', interactive: false, keyboard: false, icon: L.divIcon({ className: 'print-grid-label', html: formatGridCoordinate(longitude, false), iconSize: [58, 13], iconAnchor: [0, 0] }) }));
+    }
+  }
   window.addEventListener('beforeprint', function () {
     updatePrintComposition();
     map.invalidateSize({ animate: false });
+    buildPrintGrid();
+    printGridLayer.addTo(map);
+  });
+  window.addEventListener('afterprint', function () {
+    if (map.hasLayer(printGridLayer)) map.removeLayer(printGridLayer);
   });
   document.getElementById('inspector-close').addEventListener('click', function () { document.getElementById('feature-inspector').hidden = true; });
   document.getElementById('inspector-zoom').addEventListener('click', function () { var bounds = getLayerBounds(selectedInspectorLayer); if (bounds) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 18 }); });
