@@ -1272,6 +1272,133 @@ async function initializeScene() {
   return { scene, camera, controls };
 }
 
+function createPrintSnapshot(scene, camera, orbitControls) {
+  const width = 2400;
+  const height = 2520;
+  const printAspect = width / height;
+  const printCamera = camera.clone();
+  const targetCenter = orbitControls.target.clone();
+  const viewOffset = printCamera.position.clone().sub(targetCenter);
+  viewOffset.multiplyScalar(Math.max(1, camera.aspect / printAspect));
+  printCamera.position.copy(targetCenter).add(viewOffset);
+  printCamera.aspect = printAspect;
+  printCamera.lookAt(targetCenter);
+  printCamera.updateProjectionMatrix();
+
+  const target = new THREE.WebGLRenderTarget(width, height, {
+    format: THREE.RGBAFormat,
+    type: THREE.UnsignedByteType,
+    depthBuffer: true,
+    stencilBuffer: false,
+    samples: 0
+  });
+  target.texture.colorSpace = THREE.SRGBColorSpace;
+  target.texture.generateMipmaps = false;
+  const previousTarget = renderer.getRenderTarget();
+  const previousViewport = renderer.getViewport(new THREE.Vector4());
+  const previousScissor = renderer.getScissor(new THREE.Vector4());
+  const previousScissorTest = renderer.getScissorTest();
+  const pixels = new Uint8Array(width * height * 4);
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d", { alpha: false });
+  if (!context) {
+    target.dispose();
+    throw new Error("No fue posible crear la imagen de impresión.");
+  }
+  try {
+    renderer.setRenderTarget(target);
+    renderer.setViewport(0, 0, width, height);
+    renderer.setScissorTest(false);
+    renderer.render(scene, printCamera);
+    renderer.readRenderTargetPixels(target, 0, 0, width, height, pixels);
+    const imageData = context.createImageData(width, height);
+    const rowSize = width * 4;
+    for (let row = 0; row < height; row++) {
+      const sourceStart = (height - 1 - row) * rowSize;
+      imageData.data.set(pixels.subarray(sourceStart, sourceStart + rowSize), row * rowSize);
+    }
+    context.putImageData(imageData, 0, 0);
+  } finally {
+    renderer.setRenderTarget(previousTarget);
+    renderer.setViewport(previousViewport);
+    renderer.setScissor(previousScissor);
+    renderer.setScissorTest(previousScissorTest);
+    target.dispose();
+    renderer.render(scene, camera);
+  }
+  return canvas.toDataURL("image/png");
+}
+
+function updatePrint3DComposition() {
+  const layerList = document.getElementById("print-3d-layers");
+  layerList.replaceChildren();
+  const activeLayers = [...document.querySelectorAll(".layer-toggle input:checked")];
+  for (const input of activeLayers) {
+    const source = input.closest(".layer-toggle");
+    const row = source.cloneNode(true);
+    row.querySelector("input").remove();
+    layerList.appendChild(row);
+  }
+  if (!activeLayers.length) layerList.textContent = "Sin capas activas.";
+
+  const riskVisible = document.getElementById("layer-risk").checked;
+  const threatVisible = document.getElementById("layer-threat").checked;
+  const legend = document.getElementById("print-3d-legend");
+  legend.replaceChildren();
+  if (riskVisible || threatVisible) {
+    const sourceItems = [...document.querySelectorAll(".legend-grid .legend-item")];
+    const filteredItems = sourceItems.filter(item => {
+      const label = item.textContent.toLocaleLowerCase("es");
+      if (label.includes("amenaza media")) return threatVisible;
+      if (label.includes("alto no mitigable")) return riskVisible || threatVisible;
+      if (label.includes("bajo / amenaza baja")) return riskVisible || threatVisible;
+      return riskVisible;
+    });
+    const grid = document.createElement("div");
+    grid.className = "legend-grid";
+    filteredItems.forEach(item => grid.appendChild(item.cloneNode(true)));
+    legend.appendChild(grid);
+  } else {
+    legend.textContent = "Activa zonificación de riesgo o amenaza para incluir sus clases.";
+  }
+
+  const bounds = window.__terrain3d.focusBounds;
+  const centerEasting = (bounds.xmin + bounds.xmax) / 2;
+  const centerNorthing = (bounds.ymin + bounds.ymax) / 2;
+  document.getElementById("print-3d-center").textContent = "E " + formatNumber(centerEasting, 0) + " m · N " + formatNumber(centerNorthing, 0) + " m";
+  const date = new Intl.DateTimeFormat("es-CO", { year: "numeric", month: "long", day: "numeric" }).format(new Date());
+  document.getElementById("print-3d-date").textContent = date;
+  document.getElementById("print-3d-footer-date").textContent = date;
+}
+
+async function downloadTerrainPdf() {
+  const button = document.getElementById("download-map-pdf");
+  const terrain = window.__terrain3d;
+  if (!terrain || !renderer) return;
+  button.disabled = true;
+  button.textContent = "Preparando PDF…";
+  setStatus("Preparando una captura de alta resolución para impresión…");
+  try {
+    terrain.controls.update();
+    const image = createPrintSnapshot(terrain.scene, terrain.camera, terrain.controls);
+    updatePrint3DComposition();
+    const imageElement = document.getElementById("print-3d-image");
+    imageElement.src = image;
+    await imageElement.decode();
+    document.getElementById("print-sheet").setAttribute("aria-hidden", "false");
+    setStatus("Composición lista. En el diálogo de impresión, elige Guardar como PDF.");
+    window.print();
+  } catch (error) {
+    console.error("No se pudo preparar el mapa PDF 3D:", error);
+    setStatus("No se pudo preparar la descarga PDF. " + (error && error.message ? error.message : "Vuelve a intentarlo."), "error");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Descargar mapa PDF";
+  }
+}
+
 async function main() {
   if (!container || !statusEl || !diagnosticsEl) throw new Error("Faltan elementos requeridos en vista-3d.html.");
   const { scene, camera } = await initializeScene();
