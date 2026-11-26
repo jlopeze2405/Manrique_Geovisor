@@ -9,8 +9,9 @@
     lat = (180 / Math.PI) * (2 * Math.atan(Math.exp(lat * Math.PI / 180)) - Math.PI / 2);
     return [lat, lng];
   }
-  var manriqueSouthWest = webMercatorToLatLng(-8410971.368524, 698894.894891);
-  var manriqueNorthEast = webMercatorToLatLng(-8407927.578103, 700845.937304);
+  // Vista inicial aproximada de Manrique completo; el límite barrial ajusta el encuadre al cargar.
+  var manriqueSouthWest = [6.255, -75.575];
+  var manriqueNorthEast = [6.305, -75.535];
   var manriqueImageBounds = L.latLngBounds(manriqueSouthWest, manriqueNorthEast);
   var map = L.map('map', { zoomControl: false, doubleClickZoom: true });
   map.fitBounds(manriqueImageBounds, { padding: [30, 30], maxZoom: 13, animate: false });
@@ -67,6 +68,7 @@
   var riskZoneFeatures = [];
   var riskZonesReady = false;
   var riskZoneVersion = 0;
+  var neighborhoodDistributionRevision = 0;
   var riskFilter = document.getElementById('risk-filter');
   var neighborhoodFilter = document.getElementById('neighborhood-filter');
   var baseLayers = [imagery, streets];
@@ -382,6 +384,12 @@
           });
         }
       } else {
+        if (input.checked && layer._startLoad) {
+          var startLayerLoad = layer._startLoad;
+          layer._startLoad = null;
+          state.textContent = 'CARGANDO';
+          startLayerLoad();
+        }
         if (input.checked) layer.addTo(map);
         else map.removeLayer(layer);
         state.textContent = input.checked ? 'ON' : 'OFF';
@@ -483,11 +491,22 @@
     }).then(function (buffer) {
       return parseGeoraster(buffer, { readOnDemand: true });
     }).then(function (georaster) {
+      if (Number(georaster.projection) === 9377) {
+        if (!window.proj4) throw new Error('No se pudo cargar Proj4 para transformar el GeoTIFF EPSG:9377.');
+        var southWest = proj4('EPSG:9377', 'EPSG:4326', [georaster.xmin, georaster.ymin]);
+        var northEast = proj4('EPSG:9377', 'EPSG:4326', [georaster.xmax, georaster.ymax]);
+        georaster.xmin = southWest[0]; georaster.ymin = southWest[1];
+        georaster.xmax = northEast[0]; georaster.ymax = northEast[1];
+        georaster.pixelWidth = (georaster.xmax - georaster.xmin) / georaster.width;
+        georaster.pixelHeight = (georaster.ymax - georaster.ymin) / georaster.height;
+        georaster.projection = 4326;
+      }
       var raster = new GeoRasterLayer({
         georaster: georaster,
         resolution: 256,
         pixelValuesToColorFn: function (values) {
           if (values[0] == null || Number.isNaN(values[0])) return null;
+          if (typeof options.colorForValue === 'function') return options.colorForValue(values[0]);
           if (values.length < 3) {
             var minimum = georaster.mins[0];
             var maximum = georaster.maxs[0];
@@ -713,7 +732,7 @@
         if (score > bestScore) { bestScore = score; found = item; }
       });
     }
-    var label = found ? String(propertyValue(found.properties, ['nombre', 'label']) || '') : '';
+    var label = found ? String(propertyValue(found.properties, ['nombre_bar', 'barrio', 'nombre', 'label']) || '') : '';
     feature._neighborhoodLabel = label;
     return label;
   }
@@ -1085,14 +1104,13 @@
   }
 
   function applyDataFilters() {
-    parcelFilterFeatures.concat(constructionFilterFeatures).forEach(function (feature) {
-      var visible = passesDataFilters(feature);
-      var layer = feature._leafletLayer;
+    var filtersActive = (neighborhoodFilter && neighborhoodFilter.value !== 'all') ||
+      (riskFilter && riskFilter.value !== 'all') || (landuseFilter && landuseFilter.value !== 'all') ||
+      (entityFilter && entityFilter.value.trim());
+    if (filtersActive) parcelFilterFeatures.concat(constructionFilterFeatures).forEach(function (feature) {
+      var visible = passesDataFilters(feature), layer = feature._leafletLayer;
       if (!layer || typeof layer.setStyle !== 'function') return;
-      var fill = layer._isParcelLayer ? 0.07 : 0.18;
-      layer.setStyle({ opacity: visible ? 0.95 : 0, fillOpacity: visible ? fill : 0 });
-      var element = layer.getElement && layer.getElement();
-      if (element) element.style.pointerEvents = visible ? 'auto' : 'none';
+      layer.setStyle({ opacity: visible ? 0.95 : 0, fillOpacity: visible ? (layer._isParcelLayer ? 0.07 : 0.18) : 0 });
     });
     if (spatialQueryActive) {
       var visibleSpatial = spatialSelection.filter(function (item) { return passesDataFilters(item.feature); });
@@ -1110,14 +1128,29 @@
     var selected = neighborhoodFilter ? neighborhoodFilter.value : 'all';
     var parcels = parcelFilterFeatures.filter(passesDataFilters);
     var buildings = constructionFilterFeatures.filter(passesDataFilters);
-    var atRisk = buildings.filter(buildingOverlapsRisk).length;
+    var statisticsRevision = (updateAreaStatistics._revision || 0) + 1;
+    updateAreaStatistics._revision = statisticsRevision;
     var countNode = document.getElementById('parcel-count');
     var percentNode = document.getElementById('building-risk-percent');
     var scopeNode = document.getElementById('stats-scope');
     if (countNode) countNode.textContent = parcels.length.toLocaleString('es');
     var buildingCount = document.getElementById('building-count');
     if (buildingCount) buildingCount.textContent = buildings.length.toLocaleString('es');
-    if (percentNode) percentNode.textContent = !riskZonesReady ? '—' : ((buildings.length ? Math.round(atRisk * 100 / buildings.length) : 0) + '%');
+    if (percentNode) percentNode.textContent = !riskZonesReady ? '—' : (buildings.length ? 'Calculando…' : '0%');
+    if (percentNode && riskZonesReady && buildings.length) {
+      var cursor = 0, atRisk = 0;
+      var countRiskBatch = function (deadline) {
+        if (statisticsRevision !== updateAreaStatistics._revision) return;
+        var limit = Math.min(buildings.length, cursor + 350);
+        while (cursor < limit && (!deadline || deadline.timeRemaining() > 2)) {
+          if (buildingOverlapsRisk(buildings[cursor++])) atRisk++;
+        }
+        if (cursor < buildings.length) {
+          (window.requestIdleCallback || function (callback) { return window.setTimeout(function () { callback(null); }, 0); })(countRiskBatch);
+        } else percentNode.textContent = Math.round(atRisk * 100 / buildings.length) + '%';
+      };
+      (window.requestIdleCallback || function (callback) { return window.setTimeout(function () { callback(null); }, 0); })(countRiskBatch);
+    }
     if (scopeNode) {
       var scopeParts = [];
       if (selected !== 'all' && neighborhoodFilter) scopeParts.push('barrio: ' + neighborhoodFilter.options[neighborhoodFilter.selectedIndex].textContent);
@@ -1153,7 +1186,33 @@
       });
     }
     var entities = parcels.concat(buildings);
-    renderDistribution('neighborhood-distribution', entities, function (feature) { return neighborhoodForFeature(feature) || 'Sin barrio asignado'; });
+    var neighborhoodRevision = ++neighborhoodDistributionRevision;
+    var neighborhoodCounts = Object.create(null), neighborhoodCursor = 0;
+    var countNeighborhoodBatch = function (deadline) {
+      if (neighborhoodRevision !== neighborhoodDistributionRevision) return;
+      var limit = Math.min(entities.length, neighborhoodCursor + 300);
+      while (neighborhoodCursor < limit && (!deadline || deadline.timeRemaining() > 2)) {
+        var label = neighborhoodForFeature(entities[neighborhoodCursor++]) || 'Sin barrio asignado';
+        neighborhoodCounts[label] = (neighborhoodCounts[label] || 0) + 1;
+      }
+      if (neighborhoodCursor < entities.length) {
+        (window.requestIdleCallback || function (callback) { return window.setTimeout(function () { callback(null); }, 0); })(countNeighborhoodBatch);
+        return;
+      }
+      var distributionHost = document.getElementById('neighborhood-distribution');
+      if (!distributionHost) return;
+      var sortedNeighborhoods = Object.keys(neighborhoodCounts).map(function (key) { return [key, neighborhoodCounts[key]]; }).sort(function (a, b) { return b[1] - a[1] || a[0].localeCompare(b[0], 'es'); });
+      if (sortedNeighborhoods.length > 8) sortedNeighborhoods = sortedNeighborhoods.slice(0, 7).concat([['Otros barrios', sortedNeighborhoods.slice(7).reduce(function (sum, item) { return sum + item[1]; }, 0)]]);
+      distributionHost.textContent = '';
+      sortedNeighborhoods.forEach(function (item) {
+        var row = document.createElement('div'); row.className = 'distribution-row';
+        var labelNode = document.createElement('span'); labelNode.textContent = item[0] + ' · ' + item[1].toLocaleString('es');
+        var track = document.createElement('span'); track.className = 'distribution-track';
+        var bar = document.createElement('i'); bar.style.width = (entities.length ? Math.round(item[1] * 100 / entities.length) : 0) + '%'; track.appendChild(bar);
+        row.append(labelNode, track); distributionHost.appendChild(row);
+      });
+    };
+    if (entities.length) (window.requestIdleCallback || function (callback) { return window.setTimeout(function () { callback(null); }, 0); })(countNeighborhoodBatch);
   }
 
   if (riskFilter) riskFilter.addEventListener('change', applyDataFilters);
@@ -1456,8 +1515,9 @@
     overlays[name] = group;
     group._sourcePath = path + '.shp';
     group._sourceCrs = 'EPSG:9377'; group._displayCrs = 'EPSG:4326 · shpjs transforma las geometrías al cargarlas';
-    var styleEditable = !/Predios_Influencia|Construcciones_Area_Estudio/i.test(path);
-    addLayerControl(name, group, color, false, false, styleEditable);
+    var styleEditable = !/Predios_Influencia|Predios_Estudio|Construcciones_Area_Estudio|Construcciones_Barrios_Estudio|Comuna_3[\\/]Predios|Contrucciones_Manrique/i.test(path);
+    var initiallyVisible = /BARRIOS_INFLUENCIA/i.test(path);
+    addLayerControl(name, group, color, initiallyVisible, false, styleEditable);
     var row = Array.from(layerList.querySelectorAll('.layer-item')).find(function (item) {
       return item.querySelector('label').textContent === name;
     });
@@ -1471,14 +1531,23 @@
       tableButton.addEventListener('click', function (event) { event.preventDefault(); event.stopPropagation(); if (group.featureData) showAttributeTable(name, group.featureData); });
       row.appendChild(tableButton);
     }
-    if (row) row.querySelector('.layer-state').textContent = 'CARGANDO';
-
-    var source = /\.zip$/i.test(path)
-      ? fetch(path).then(function (response) {
-          if (!response.ok) throw new Error('HTTP ' + response.status);
-          return response.arrayBuffer();
-        }).then(function (buffer) { return shp(buffer); })
-      : shp(new URL(path, document.baseURI).href);
+    var deferLargeLayer = /visor_optimizado[\\/](?:predios[\\/]Predios_Manrique|construcciones[\\/]Construcciones_Manrique)|Comuna_3[\\/]Predios|Contrucciones_Manrique/i.test(path);
+    if (row) row.querySelector('.layer-state').textContent = deferLargeLayer ? 'LISTA' : 'CARGANDO';
+    var source = new Promise(function (resolve, reject) {
+      group._startLoad = function () {
+        var request = /\.zip$/i.test(path)
+          ? fetch(path).then(function (response) {
+              if (!response.ok) throw new Error('HTTP ' + response.status);
+              return response.arrayBuffer();
+            }).then(function (buffer) { return shp(buffer); })
+          : shp(new URL(path, document.baseURI).href);
+        request.then(resolve, reject);
+      };
+      if (!deferLargeLayer || (row && row.querySelector('input').checked)) {
+        if (row) row.querySelector('.layer-state').textContent = 'CARGANDO';
+        group._startLoad(); group._startLoad = null;
+      }
+    });
     source.then(function (geojson) {
       var collections = Array.isArray(geojson) ? geojson :
         (geojson && geojson.type === 'FeatureCollection' ? [geojson] : Object.keys(geojson || {}).map(function (key) { return geojson[key]; }));
@@ -1487,33 +1556,43 @@
         if (item && item.type === 'Feature') all.push(item);
         return all;
       }, []);
-      var isBoundary = path.indexOf('shp_barrios_y_veredas_mr') !== -1 || path.indexOf('Barrios_Manrique') !== -1;
+      var isBoundary = path.indexOf('shp_barrios_y_veredas_mr') !== -1 || path.indexOf('Barrios_Manrique') !== -1 || path.indexOf('BARRIOS_INFLUENCIA') !== -1;
       var isStudyBuffer = /Bff_Uva/i.test(path);
-      var isParcelLayer = /Predios_Influencia/i.test(path);
-      var isConstructionLayer = /Construcciones_Area_Estudio/i.test(path);
-      var riskKind = path.indexOf('Amenaza_Mov_Masa') !== -1 ? 'threat' : (/RIESGO_MOV_MASA|Riesgo_Mov_Masa|Construcciones_Area_Estudio|Predios_Influencia/i.test(path) ? 'landslide' : null);
+      var isParcelLayer = /Predios_Influencia|Predios_Estudio|Comuna_3[\\/]Predios|visor_optimizado[\\/]predios/i.test(path);
+      var isConstructionLayer = /Construcciones_Area_Estudio|Construcciones_Barrios_Estudio[\\/]Construcciones|Contrucciones_Manrique|visor_optimizado[\\/]construcciones/i.test(path);
+      var riskKind = path.indexOf('Amenaza_Mov_Masa') !== -1 ? 'threat' : (/RIESGO_MOV_MASA|Riesgo_Mov_Masa|Construcciones_Area_Estudio|Construcciones_Barrios_Estudio|Predios_Influencia|Predios_Estudio|visor_optimizado[\\/]construcciones/i.test(path) ? 'landslide' : null);
       var isRiskZoneLayer = riskKind && !isParcelLayer && !isConstructionLayer;
       var featurePane = isRiskZoneLayer ? 'riskPane' : (isParcelLayer ? 'parcelPane' : (isConstructionLayer ? 'constructionPane' : undefined));
-      // Mantener el orden original en la tabla y dibujar los predios grandes
-      // antes que los pequeños para que los menores queden por encima.
-      var renderFeatures = isParcelLayer ? features.slice().sort(function (a, b) { return geometryArea(b.geometry) - geometryArea(a.geometry); }) : features;
-      if (path.indexOf('Barrios_Manrique') !== -1) {
+      var renderFeatures = features;
+      if (path.indexOf('Barrios_Manrique') !== -1 || path.indexOf('BARRIOS_INFLUENCIA') !== -1) {
         neighborhoodFeatures = features;
+        if (neighborhoodFilter) {
+          var selectedNeighborhood = neighborhoodFilter.value;
+          var neighborhoodNames = Array.from(new Set(features.map(function (feature) { return String(propertyValue(feature.properties, ['nombre_bar', 'barrio', 'nombre', 'label']) || '').trim(); }).filter(Boolean))).sort(function (a, b) { return a.localeCompare(b, 'es'); });
+          neighborhoodFilter.textContent = '';
+          var allNeighborhoods = document.createElement('option'); allNeighborhoods.value = 'all'; allNeighborhoods.textContent = 'Todos los barrios'; neighborhoodFilter.appendChild(allNeighborhoods);
+          neighborhoodNames.forEach(function (label) { var option = document.createElement('option'); option.value = label; option.textContent = label; neighborhoodFilter.appendChild(option); });
+          neighborhoodFilter.value = neighborhoodNames.indexOf(selectedNeighborhood) !== -1 ? selectedNeighborhood : 'all';
+        }
         parcelFilterFeatures.concat(constructionFilterFeatures).forEach(function (feature) { delete feature._areaMembershipCache; delete feature._neighborhoodLabel; });
       }
       if (isParcelLayer) parcelFilterFeatures = features;
       if (isConstructionLayer) constructionFilterFeatures = features;
       if (isRiskZoneLayer && riskKind === 'landslide') { riskZoneFeatures = features; riskZonesReady = true; riskZoneVersion++; }
       features.forEach(function (feature) { feature._entityKind = isParcelLayer ? 'parcel' : (isConstructionLayer ? 'building' : ''); });
+      // Thousands of cadastral polygons overwhelm SVG DOM rendering; Canvas keeps the
+      // large Manrique layers interactive without creating one DOM node per feature.
+      var layerRenderer = isParcelLayer || isConstructionLayer ? L.canvas({ pane: featurePane || 'overlayPane', padding: 0.5 }) : undefined;
       var layer = L.geoJSON({ type: 'FeatureCollection', features: renderFeatures }, {
+        renderer: layerRenderer,
         bubblingMouseEvents: true,
         style: function (feature) {
           var appearance = riskKind ? riskAppearance(feature && feature.properties, riskKind) : {};
           var featureColor = riskKind ? appearance.color : color;
           return {
             pane: featurePane,
-            color: isBoundary ? '#e8edf2' : (isStudyBuffer ? '#b87900' : featureColor),
-            weight: isStudyBuffer ? 3 : (isBoundary ? 1.25 : (isRiskZoneLayer || isConstructionLayer ? appearance.weight : (isParcelLayer ? 1.15 : 1.5))),
+            color: isBoundary ? '#ff35d3' : (isStudyBuffer ? '#b87900' : featureColor),
+            weight: isStudyBuffer ? 3 : (isBoundary ? 2.5 : (isRiskZoneLayer || isConstructionLayer ? appearance.weight : (isParcelLayer ? 1.15 : 1.5))),
             opacity: 0.95,
             fillColor: featureColor,
             fillOpacity: isStudyBuffer ? 0.08 : (isRiskZoneLayer ? appearance.fillOpacity : (isParcelLayer ? 0.08 : (isConstructionLayer ? Math.min(0.22, appearance.fillOpacity + 0.06) : 0))),
@@ -1530,14 +1609,14 @@
           var properties = feature && feature.properties ? feature.properties : {};
           // A feature click is handled here; prevent Leaflet from forwarding it
           // to the map click handler, which clears an active selection.
-          featureLayer.options.bubblingMouseEvents = false;
+          featureLayer.options.bubblingMouseEvents = !(isParcelLayer || isConstructionLayer);
           featureLayer._isParcelLayer = isParcelLayer;
           featureLayer._isConstructionLayer = isConstructionLayer;
           featureLayer._featureLayerName = name;
-          var content = isParcelLayer ? buildParcelPopup(properties) : (isConstructionLayer ? buildConstructionPopup(properties) : document.createElement('div'));
-          if (isParcelLayer || isConstructionLayer) {
-            featureLayer.bindPopup(content, { maxWidth: 350, minWidth: 260, className: 'parcel-popup-container' });
-          } else {
+          // Build popup DOM only for small thematic layers. Cadastral layers have
+          // tens of thousands of features; their details are shown in the inspector.
+          if (!isParcelLayer && !isConstructionLayer) {
+            var content = document.createElement('div');
             var title = document.createElement('strong');
             title.textContent = name;
             content.appendChild(title);
@@ -1548,11 +1627,8 @@
             });
             featureLayer.bindPopup(content);
           }
-          // Keep the popup available for explicit actions, but do not let
-          // Leaflet open it on every map click automatically.
-          if (featureLayer._openPopup) featureLayer.off('click', featureLayer._openPopup, featureLayer);
           featureLayer._originalFeatureStyle = Object.assign({}, featureLayer.options);
-          featureLayer.on('click', function (event) {
+          if (!isParcelLayer && !isConstructionLayer) featureLayer.on('click', function (event) {
             if (activeAction || activeEdit) { if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent); return; }
             if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent);
             if (!selectionToolActive) {
@@ -1568,7 +1644,7 @@
           });
           feature._leafletLayer = featureLayer;
           if (isBoundary) {
-            var label = String(properties.nombre || properties.label || '').trim();
+            var label = String(propertyValue(properties, ['nombre_bar', 'barrio', 'nombre', 'label']) || '').trim();
             if (label) {
               featureLayer.bindTooltip(label, { permanent: false, direction: 'center', className: 'map-feature-label', interactive: false });
               featureLabels.push({ layer: featureLayer, group: group, bounds: getLayerBounds(featureLayer), minZoom: isBoundary ? 13 : 16 });
@@ -1576,8 +1652,14 @@
           }
         }
       });
+      if (isParcelLayer || isConstructionLayer) layer.on('click', function (event) {
+        if (activeAction || activeEdit) { if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent); return; }
+        if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent);
+        if (selectionToolActive && event.layer) selectFeatureLayer(event.layer);
+      });
       if (isParcelLayer || isConstructionLayer) {
-        var minZoom = isParcelLayer ? 16 : 15;
+        // Make cadastral layers visible at neighborhood scale instead of only at street level.
+        var minZoom = 13;
         var maxZoom = 19;
         group._scaleLimitedChild = layer;
         group._scaleMinZoom = minZoom;
@@ -1585,22 +1667,23 @@
         scaleLimitedLayers.push({ group: group, layer: layer, state: row && row.querySelector('.layer-state'), minZoom: minZoom, maxZoom: maxZoom });
       }
       group.addLayer(layer);
+      if (row && row.querySelector('input').checked && !map.hasLayer(group)) group.addTo(map);
       group.featureData = features;
       if (isConstructionLayer) setBuildingDiagnosticReady(features);
       var controlEntry = row && row.parentElement;
       if (controlEntry && controlEntry._customStyle) applyThemeStyle(layer, row._colorInput.value, Number(row._weightInput.value), false);
       else if (controlEntry && controlEntry._customWeight) applyLayerWeight(layer, Number(row._weightInput.value));
-      if (/Bff_Uva/i.test(path) && !userChangedView) {
+      if (isBoundary && !userChangedView) {
         var studyBounds = getLayerBounds(layer);
         if (studyBounds) {
-          map.fitBounds(studyBounds, { padding: [90, 90], maxZoom: 15, animate: false });
+          map.fitBounds(studyBounds, { padding: [45, 45], maxZoom: 13, animate: false });
           initialCenter = map.getCenter(); initialZoom = map.getZoom(); userChangedView = false;
         }
       }
       var opacityInput = row && row._opacityInput;
       if (opacityInput) opacityInput.dispatchEvent(new Event('input'));
       if (isParcelLayer || isConstructionLayer) updateScaleLimitedLayers();
-      if (path.indexOf('Barrios_Manrique') !== -1) applyDataFilters();
+      if (path.indexOf('Barrios_Manrique') !== -1 || path.indexOf('BARRIOS_INFLUENCIA') !== -1) applyDataFilters();
       if (isRiskZoneLayer && riskKind === 'landslide') applyDataFilters();
       if (isParcelLayer || isConstructionLayer) applyDataFilters();
       if (isParcelLayer || isConstructionLayer) tryResolveDirectEntityLink();
@@ -1626,20 +1709,25 @@
   }
 
   // Capas vectoriales incluidas en data; quedan disponibles desde el panel.
-  loadShapefileOverlay('data/recorte/Amenaza_Mov_Masa', 'Amenaza por movimiento en masa', '#f72585');
-  loadShapefileOverlay('data/Buffer_Area_Estudio/Bff_Uva', 'Buffer del área de estudio', '#ffc247');
-  loadShapefileOverlay('data/Barrios_Manrique/Barrios_Manrique', 'Barrios de Manrique', '#06d6a0');
-  loadShapefileOverlay('data/Comunas_Corregimientos/Comunas_Corregimientos_Med', 'Comunas y corregimientos', '#00b4d8');
-  loadShapefileOverlay('data/Curva_Nivel/Curva_nivel_10x10_10', 'Curvas de nivel · 10 m', '#ffb703');
-  loadShapefileOverlay('data/Construcciones_Area_Estudio/Construcciones_Area_Estudio', 'Construcciones del área de estudio', '#e76f51');
-  loadShapefileOverlay('data/Predios/Predios_Influencia', 'Predios de la zona de influencia', '#9b5de5');
-  loadShapefileOverlay('data/RIESGO_MOV_MASA/RIESGO_MOV_MASA', 'Riesgo por movimiento en masa', '#4361ee');
+  loadShapefileOverlay('data/Amenaza_Mov_Masa/Amenaza_Mov_Masa', 'Amenaza por movimiento en masa', '#f72585');
+  loadShapefileOverlay('data/BARRIOS_INFLUENCIA/Barrios', 'Límite de los barrios de estudio', '#06d6a0');
+  loadShapefileOverlay('data/Curva_Nivel/Contour_5m', 'Curvas de nivel · 5 m', '#ffb703');
+  loadShapefileOverlay('data/Construcciones_Barrios_Estudio/Construcciones', 'Construcciones de los barrios de estudio', '#e76f51');
+  loadShapefileOverlay('data/Predios_Barrios_Estudio/Predios_Estudio', 'Predios de los barrios de estudio', '#9b5de5');
+  loadShapefileOverlay('data/Manzanas_Barrios_Estudio/Manzanas', 'Manzanas de los barrios de estudio', '#00b4d8');
+  loadShapefileOverlay('data/Riesgo_Mov_Masa/Riesgo_Mov_Masa', 'Riesgo por movimiento en masa', '#4361ee');
   var localLayerColorIndex = 0;
   var localLayerColors = ['#0f7180', '#c2410c', '#7c3aed', '#2563eb', '#b42332', '#15803d'];
   if (window.proj4) {
     proj4.defs('EPSG:3116', '+proj=tmerc +lat_0=4.59620041666667 +lon_0=-74.0775079166667 +k=1 +x_0=1000000 +y_0=1000000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
     proj4.defs('EPSG:9377', '+proj=tmerc +lat_0=4 +lon_0=-73 +k=0.9992 +x_0=5000000 +y_0=2000000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
   }
+  loadGeoTiffOverlay('data/Raster/Pendiente/5metros_Slope.tif', 'Pendiente del terreno · 5 m', {
+    colorForValue: function (value) {
+      if (!Number.isFinite(value) || value < 0 || value > 90) return null;
+      return value < 15 ? '#2a9d62' : (value < 30 ? '#b6c84b' : (value < 45 ? '#f1a340' : '#c43c39'));
+    }
+  }, '#2a9d62', false, false);
 
   function normalizeFeatureCollections(value) {
     var values = Array.isArray(value) ? value : (value && value.type === 'FeatureCollection' ? [value] : (value && value.type === 'Feature' ? [{ type: 'FeatureCollection', features: [value] }] : Object.keys(value || {}).map(function (key) { return value[key]; })));

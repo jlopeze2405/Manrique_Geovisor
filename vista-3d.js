@@ -1,41 +1,44 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
+import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
+import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import { fromArrayBuffer } from "geotiff";
 
 const CONFIG = Object.freeze({
   verticalScale: 1.0,
-  demUrl: "data/Raster/ZONA_ESTUDIO.tif",
-  worldFileUrl: "data/Raster/ZONA_ESTUDIO.tfw",
-  buildingsUrl: "data/Construcciones_Area_Estudio/Construcciones_Area_Estudio.shp",
-  buildingsIndexUrl: "data/Construcciones_Area_Estudio/Construcciones_Area_Estudio.shx",
-  buildingsAttributesUrl: "data/Construcciones_Area_Estudio/Construcciones_Area_Estudio.dbf",
-  buildingsEncodingUrl: "data/Construcciones_Area_Estudio/Construcciones_Area_Estudio.cpg",
-  buildingsProjectionUrl: "data/Construcciones_Area_Estudio/Construcciones_Area_Estudio.prj",
-  parcelsUrl: "data/Predios/Predios_Influencia.shp",
-  parcelsIndexUrl: "data/Predios/Predios_Influencia.shx",
-  parcelsProjectionUrl: "data/Predios/Predios_Influencia.prj",
-  parcelsAttributesUrl: "data/Predios/Predios_Influencia.dbf",
-  parcelsEncodingUrl: "data/Predios/Predios_Influencia.cpg",
-  riskUrl: "data/RIESGO_MOV_MASA/RIESGO_MOV_MASA.shp",
-  riskIndexUrl: "data/RIESGO_MOV_MASA/RIESGO_MOV_MASA.shx",
-  riskAttributesUrl: "data/RIESGO_MOV_MASA/RIESGO_MOV_MASA.dbf",
-  riskEncodingUrl: "data/RIESGO_MOV_MASA/RIESGO_MOV_MASA.cpg",
-  riskProjectionUrl: "data/RIESGO_MOV_MASA/RIESGO_MOV_MASA.prj",
-  threatUrl: "data/recorte/Amenaza_Mov_Masa.shp",
-  threatIndexUrl: "data/recorte/Amenaza_Mov_Masa.shx",
-  threatAttributesUrl: "data/recorte/Amenaza_Mov_Masa.dbf",
-  threatEncodingUrl: "data/recorte/Amenaza_Mov_Masa.CPG",
-  threatProjectionUrl: "data/recorte/Amenaza_Mov_Masa.prj",
-  bufferUrl: "data/Buffer_Area_Estudio/Bff_Uva.shp",
-  bufferIndexUrl: "data/Buffer_Area_Estudio/Bff_Uva.shx",
-  bufferProjectionUrl: "data/Buffer_Area_Estudio/Bff_Uva.prj",
+  demUrl: "data/Raster/DEM/DEM_5m.tif",
+  worldFileUrl: "data/Raster/DEM/DEM_5m.tfw",
+  buildingsUrl: "data/Construcciones_Barrios_Estudio/Construcciones.shp",
+  buildingsIndexUrl: "data/Construcciones_Barrios_Estudio/Construcciones.shx",
+  buildingsAttributesUrl: "data/Construcciones_Barrios_Estudio/Construcciones.dbf",
+  buildingsEncodingUrl: "data/Construcciones_Barrios_Estudio/Construcciones.cpg",
+  buildingsProjectionUrl: "data/Construcciones_Barrios_Estudio/Construcciones.prj",
+  parcelsUrl: "data/Predios_Barrios_Estudio/Predios_Estudio.shp",
+  parcelsIndexUrl: "data/Predios_Barrios_Estudio/Predios_Estudio.shx",
+  parcelsProjectionUrl: "data/Predios_Barrios_Estudio/Predios_Estudio.prj",
+  parcelsAttributesUrl: "data/Predios_Barrios_Estudio/Predios_Estudio.dbf",
+  parcelsEncodingUrl: "data/Predios_Barrios_Estudio/Predios_Estudio.cpg",
+  riskUrl: "data/Riesgo_Mov_Masa/Riesgo_Mov_Masa.shp",
+  riskIndexUrl: "data/Riesgo_Mov_Masa/Riesgo_Mov_Masa.shx",
+  riskAttributesUrl: "data/Riesgo_Mov_Masa/Riesgo_Mov_Masa.dbf",
+  riskEncodingUrl: "data/Riesgo_Mov_Masa/Riesgo_Mov_Masa.cpg",
+  riskProjectionUrl: "data/Riesgo_Mov_Masa/Riesgo_Mov_Masa.prj",
+  threatUrl: "data/Amenaza_Mov_Masa/Amenaza_Mov_Masa.shp",
+  threatIndexUrl: "data/Amenaza_Mov_Masa/Amenaza_Mov_Masa.shx",
+  threatAttributesUrl: "data/Amenaza_Mov_Masa/Amenaza_Mov_Masa.dbf",
+  threatEncodingUrl: "data/Amenaza_Mov_Masa/Amenaza_Mov_Masa.cpg",
+  threatProjectionUrl: "data/Amenaza_Mov_Masa/Amenaza_Mov_Masa.prj",
+  bufferUrl: "data/BARRIOS_INFLUENCIA/Barrios.shp",
+  bufferIndexUrl: "data/BARRIOS_INFLUENCIA/Barrios.shx",
+  bufferProjectionUrl: "data/BARRIOS_INFLUENCIA/Barrios.prj",
   estimatedHeightPerFloor: 2.1,
   terrainSkirtDepthMeters: 80,
-  focusMarginMeters: 180,
-  manifestUrl: "data/Raster/ortho_tiles_fast/tiles.json",
-  textureFolderUrl: "data/Raster/ortho_tiles_fast/",
+  focusMarginMeters: 0,
+  manifestUrl: "data/Raster/ortho_tiles_3d/tiles.json",
+  textureFolderUrl: "data/Raster/ortho_tiles_3d/",
   extentToleranceMeters: 0.00001,
-  maxPixelRatio: 1.25
+  maxPixelRatio: 0.9
 });
 
 const container = document.getElementById("threeContainer");
@@ -46,7 +49,40 @@ const northInView = new THREE.Vector3();
 let renderer;
 let rendererBackend = "";
 let controls;
+const wideLineMaterials = new Set();
 let animationFrame;
+let requestSceneRender = () => {};
+
+function yieldToBrowser() {
+  return new Promise(resolve => setTimeout(resolve, 0));
+}
+
+function addWideLineSegments(parent, sourceGeometry, { color, width = 2.5, opacity = 1, depthTest = true, renderOrder = 4 }) {
+  const sourcePositions = sourceGeometry.getAttribute("position");
+  if (!sourcePositions || !sourcePositions.count) return null;
+  const geometry = new LineSegmentsGeometry();
+  geometry.setPositions(sourcePositions.array);
+  const sourceColors = sourceGeometry.getAttribute("color");
+  if (sourceColors) geometry.setColors(sourceColors.array);
+  const material = new LineMaterial({
+    color,
+    vertexColors: Boolean(sourceColors),
+    linewidth: width,
+    worldUnits: false,
+    transparent: opacity < 1,
+    opacity,
+    depthTest,
+    depthWrite: false,
+    toneMapped: false
+  });
+  material.resolution.set(Math.max(1, container.clientWidth), Math.max(1, container.clientHeight));
+  wideLineMaterials.add(material);
+  const lines = new LineSegments2(geometry, material);
+  lines.name = "wide_" + (parent.name || "layer") + "_outlines";
+  lines.renderOrder = renderOrder;
+  parent.add(lines);
+  return lines;
+}
 
 function setStatus(message, kind = "info") {
   statusEl.textContent = message;
@@ -191,6 +227,7 @@ async function loadBuildingFootprints(url, indexUrl, projectionUrl) {
       if (rings.length) { features.push({ id: recordNumber, rings }); partCount += parts; pointCount += points; }
     }
     offset = end;
+    if ((recordCount & 255) === 0) await yieldToBrowser();
   }
   if (indexBuffer.byteLength !== 100 + recordCount * 8) throw new Error("La cantidad de entradas del SHX no coincide con los registros SHP.");
   if (offset !== buffer.byteLength) throw new Error("El tamaño final del SHP no coincide con sus registros.");
@@ -226,6 +263,7 @@ async function loadCategoryAttributes(url, encodingUrl, fieldName, extraFields =
       records[i][field.name] = field.type === "N" || field.type === "F" ? (raw === "" ? null : Number(raw)) : raw;
     }
     values[i] = records[i][fieldName.toLowerCase()];
+    if ((i & 511) === 511) await yieldToBrowser();
   }
   return { recordCount, values, records, fieldName, encoding };
 }
@@ -246,7 +284,7 @@ async function loadParcelAttributes(url, encodingUrl) {
     fields.push(field); offset += field.length; at += 32;
   }
   if (offset !== recordLength) throw new Error("Longitud de campos DBF de lotes inconsistente.");
-  const safeNames = ["fid_", "cod_divipo", "numero_pre", "matricula_", "zona", "condicion_", "destinacio", "tipo_predi", "shape_area", "cat_amenza", "cat_riesgo"];
+  const safeNames = ["fid_", "cod_divipo", "numero_pre", "matricula_", "zona", "condicion_", "destinacio", "tipo_predi", "shape_area", "riesgo", "categoria"];
   const safeFields = fields.filter(field => safeNames.includes(field.name));
   const records = new Array(recordCount);
   for (let i = 0; i < recordCount; i++) {
@@ -258,6 +296,7 @@ async function loadParcelAttributes(url, encodingUrl) {
       record[field.name] = field.type === "N" || field.type === "F" ? (raw === "" ? null : Number(raw)) : raw;
     }
     records[i] = record;
+    if ((i & 511) === 511) await yieldToBrowser();
   }
   return { recordCount, records, encoding };
 }
@@ -292,10 +331,8 @@ async function loadBuildingAttributes(url, encodingUrl) {
     descriptorOffset += 32;
   }
   if (view.getUint8(descriptorOffset) !== 0x0d) throw new Error("El DBF no contiene el terminador de campos esperado.");
-  const required = ["altura", "numero_pis", "numero_sot", "cat_riesgo", "cat_amenza"];
-  for (const name of required) if (!fields.has(name)) throw new Error("Falta el campo " + name + " en el DBF.");
-  for (const name of ["altura", "numero_pis", "numero_sot"]) if (!["N", "F"].includes(fields.get(name).type)) throw new Error("El campo " + name + " no es numérico en el DBF.");
-  for (const name of ["cat_riesgo", "cat_amenza"]) if (fields.get(name).type !== "C") throw new Error("El campo " + name + " no es texto en el DBF.");
+  if (!fields.has("numero_pis")) throw new Error("La capa de construcciones no incluye numero_pis.");
+  for (const name of ["numero_pis", "numero_sot"]) if (fields.has(name) && !["N", "F"].includes(fields.get(name).type)) throw new Error("El campo " + name + " no es numérico en el DBF.");
   let recordFieldOffset = 1;
   for (const field of fields.values()) {
     field.offset = recordFieldOffset;
@@ -311,6 +348,7 @@ async function loadBuildingAttributes(url, encodingUrl) {
     if (deleted !== 0x20) throw new Error("El registro DBF " + (index + 1) + " está eliminado o tiene una marca inválida.");
     const readNumber = name => {
       const field = fields.get(name);
+      if (!field) return null;
       const start = base + field.offset;
       const raw = decoder.decode(new Uint8Array(buffer, start, field.length)).trim();
       if (!raw) return null;
@@ -320,26 +358,23 @@ async function loadBuildingAttributes(url, encodingUrl) {
     };
     const readText = name => {
       const field = fields.get(name);
+      if (!field) return "";
       const start = base + field.offset;
       return decoder.decode(new Uint8Array(buffer, start, field.length)).trim();
     };
-    const floorCount = readNumber("numero_pis");
-    const sourceHeight = readNumber("altura");
-    const basementCount = readNumber("numero_sot");
-    if (floorCount === null || sourceHeight === null || basementCount === null || floorCount < 0 || basementCount < 0) {
-      throw new Error("Hay valores nulos o negativos en atributos de altura del registro DBF " + (index + 1) + ".");
-    }
-    if (!Number.isInteger(floorCount)) throw new Error("numero_pis no es entero en el registro DBF " + (index + 1) + ".");
+    const floorValue = readNumber("numero_pis");
+    const basementValue = readNumber("numero_sot");
+    const floorCount = Number.isFinite(floorValue) && floorValue >= 0 ? floorValue : 0;
+    const basementCount = Number.isFinite(basementValue) && basementValue >= 0 ? basementValue : 0;
     if (floorCount > 0) {
       const formulaHeight = floorCount * CONFIG.estimatedHeightPerFloor;
-      if (Math.abs(sourceHeight - formulaHeight) > 1e-7) throw new Error("Altura no coincide con numero_pis × 2,10 en el registro " + (index + 1) + ".");
       estimatedCount++;
-      records[index] = { recordId: index + 1, cbml: readText("cbml"), floorCount, basementCount, estimatedHeight: formulaHeight, heightStatus: "estimated", riskCategory: readText("cat_riesgo"), threatCategory: readText("cat_amenza") };
+      records[index] = { recordId: index + 1, cbml: readText("cbml"), floorCount, basementCount, estimatedHeight: formulaHeight, heightStatus: "estimated", riskCategory: readText("cat_riesgo") || readText("riesgo"), threatCategory: readText("cat_amenza") || readText("categoria") };
     } else {
-      if (sourceHeight !== 0) throw new Error("El registro " + (index + 1) + " tiene numero_pis=0 y Altura distinta de cero.");
       zeroCount++;
-      records[index] = { recordId: index + 1, cbml: readText("cbml"), floorCount, basementCount, estimatedHeight: null, heightStatus: "unknown", riskCategory: readText("cat_riesgo"), threatCategory: readText("cat_amenza") };
+      records[index] = { recordId: index + 1, cbml: readText("cbml"), floorCount, basementCount, estimatedHeight: null, heightStatus: "unknown", riskCategory: readText("cat_riesgo") || readText("riesgo"), threatCategory: readText("cat_amenza") || readText("categoria") };
     }
+    if ((index & 511) === 511) await yieldToBrowser();
   }
   return { recordCount, records, estimatedCount, zeroCount, source: url, encoding };
 }
@@ -365,10 +400,11 @@ function pointInRing(point, ring) {
   return inside;
 }
 
-function addBuildingFootprints(scene, source, values, mask, width, height, extent, originX, originNorth, baseElevation) {
+async function addBuildingFootprints(scene, source, values, mask, width, height, extent, originX, originNorth, baseElevation) {
   const fillPositions = [], boundaryPositions = [], featureIds = [], skippedFeatures = [];
   let polygonCount = 0, holeCount = 0, failedPolygons = 0;
-  for (const feature of source.features) {
+  for (let featureIndex = 0; featureIndex < source.features.length; featureIndex++) {
+    const feature = source.features[featureIndex];
     // Shapefile polygon winding: clockwise shells, counter-clockwise holes.
     // Use winding first; containment provides a fallback for imperfect rings.
     const shells = [], holes = [];
@@ -396,7 +432,7 @@ function addBuildingFootprints(scene, source, values, mask, width, height, exten
       if (!triangles.length || elevations.some(e => e === null)) { failedPolygons++; continue; }
       for (const triangle of triangles) for (const index of triangle) {
         const p = points[index], elevation = elevations[index];
-        fillPositions.push(p.x - originX, (elevation - baseElevation) * CONFIG.verticalScale + 0.25, p.north - originNorth);
+        fillPositions.push(p.x - originX, (elevation - baseElevation) * CONFIG.verticalScale + 1.2, p.north - originNorth);
         featureIds.push(feature.id);
       }
       for (const ring of flat) {
@@ -405,13 +441,14 @@ function addBuildingFootprints(scene, source, values, mask, width, height, exten
           const ea = sampleRenderedSurfaceElevation(a.x, a.north, values, mask, width, height, extent);
           const eb = sampleRenderedSurfaceElevation(b.x, b.north, values, mask, width, height, extent);
           if (ea === null || eb === null) continue;
-          boundaryPositions.push(a.x - originX, (ea - baseElevation) * CONFIG.verticalScale + 0.55, a.north - originNorth,
-            b.x - originX, (eb - baseElevation) * CONFIG.verticalScale + 0.55, b.north - originNorth);
+          boundaryPositions.push(a.x - originX, (ea - baseElevation) * CONFIG.verticalScale + 1.45, a.north - originNorth,
+            b.x - originX, (eb - baseElevation) * CONFIG.verticalScale + 1.45, b.north - originNorth);
         }
       }
       featureValid = true; polygonCount++;
     }
     if (!featureValid) skippedFeatures.push(feature.id);
+    if ((featureIndex & 31) === 31) await yieldToBrowser();
   }
   const layer = new THREE.Group(); layer.name = "building_footprints_layer";
   const fillGeometry = new THREE.BufferGeometry();
@@ -419,11 +456,13 @@ function addBuildingFootprints(scene, source, values, mask, width, height, exten
   const idAttribute = new THREE.Float32BufferAttribute(featureIds, 1); idAttribute.setUsage(THREE.StaticDrawUsage);
   fillGeometry.setAttribute("featureId", idAttribute); fillGeometry.computeVertexNormals();
   const fill = new THREE.Mesh(fillGeometry, new THREE.MeshBasicMaterial({ color: 0xc87945, transparent: true, opacity: 0.42, side: THREE.DoubleSide, depthTest: true, depthWrite: false, toneMapped: false }));
-  fill.name = "building_footprints_fill"; fill.userData.featureIds = [...new Set(featureIds)]; layer.add(fill);
+  fill.name = "building_footprints_fill"; fill.renderOrder = 3; fill.userData.featureIds = [...new Set(featureIds)]; layer.add(fill);
   const lineGeometry = new THREE.BufferGeometry();
   lineGeometry.setAttribute("position", new THREE.Float32BufferAttribute(boundaryPositions, 3));
-  const outlines = new THREE.LineSegments(lineGeometry, new THREE.LineBasicMaterial({ color: 0x5c321e, depthTest: true, toneMapped: false }));
-  outlines.name = "building_footprints_outlines"; layer.add(outlines);
+  const outlineMaterial = new THREE.LineBasicMaterial({ color: 0x5c321e, depthTest: true, toneMapped: false });
+  const outlines = new THREE.LineSegments(lineGeometry, outlineMaterial);
+  outlines.name = "building_footprints_outlines"; outlines.renderOrder = 3; layer.add(outlines);
+  addWideLineSegments(layer, lineGeometry, { color: 0x5c321e, width: 2.5, renderOrder: 4 });
   layer.userData = { featureCount: source.features.length - skippedFeatures.length, sourceFeatureCount: source.recordCount, polygonCount, holeCount, failedPolygons, skippedFeatureIds: skippedFeatures, features: source.features, source: CONFIG.buildingsUrl, crs: "EPSG:9377", ids: [...new Set(featureIds)] };
   scene.add(layer);
   return layer;
@@ -448,7 +487,7 @@ function buildingPolygonParts(feature) {
 
 function addPolygonOverlay(scene, source, categoryValues, kind, values, mask, width, height, extent, originX, originNorth, baseElevation) {
   const positions = [], colors = [], indices = [], outlines = [], outlineColors = [], featureIds = [], counts = {};
-  const maxTriangleEdge = kind === "buffer" ? 5 : 8;
+  const maxTriangleEdge = kind === "buffer" ? 5 : 4;
   let skippedTriangles = 0;
   let currentFeatureId = 0;
   const pushDrapedTriangle = (points, color, lift) => {
@@ -465,12 +504,12 @@ function addPolygonOverlay(scene, source, categoryValues, kind, values, mask, wi
   for (const feature of source.features) {
     currentFeatureId = feature.id;
     const symbol = categoryValues ? (kind === "risk" ? riskSymbol(categoryValues.values[feature.id - 1]) : threatSymbol(categoryValues.values[feature.id - 1])) : null;
-    const color = symbol ? new THREE.Color(symbol.hex) : (kind === "buffer" ? new THREE.Color(0xf5b335) : new THREE.Color(0x78879a));
+    const color = symbol ? new THREE.Color(symbol.hex) : (kind === "buffer" ? new THREE.Color(0xff35d3) : new THREE.Color(0x78879a));
     if (symbol) counts[symbol.key] = (counts[symbol.key] || 0) + 1;
     for (const part of buildingPolygonParts(feature)) {
       const partPoints = part.shell.concat(...part.holes);
       const triangles = THREE.ShapeUtils.triangulateShape(part.shell.map(p => new THREE.Vector2(p.x,p.north)), part.holes.map(r => r.map(p => new THREE.Vector2(p.x,p.north))));
-      const lift = kind === "risk" ? 0.12 : (kind === "buffer" ? 0.1 : 0.14);
+      const lift = kind === "risk" ? 2.0 : (kind === "buffer" ? 1.0 : 1.8);
       for (const triangle of triangles) {
         const corners = triangle.map(index => partPoints[index]);
         const [a, b, c] = corners;
@@ -489,7 +528,7 @@ function addPolygonOverlay(scene, source, categoryValues, kind, values, mask, wi
             const p0={x:a.x+(b.x-a.x)*t0,north:a.north+(b.north-a.north)*t0},p1={x:a.x+(b.x-a.x)*t1,north:a.north+(b.north-a.north)*t1};
             const e0=sampleRenderedSurfaceElevation(p0.x,p0.north,values,mask,width,height,extent),e1=sampleRenderedSurfaceElevation(p1.x,p1.north,values,mask,width,height,extent);
             if(e0===null||e1===null)continue;
-            outlines.push(p0.x-originX,(e0-baseElevation)*CONFIG.verticalScale+lift+0.04,p0.north-originNorth,p1.x-originX,(e1-baseElevation)*CONFIG.verticalScale+lift+0.04,p1.north-originNorth);
+            outlines.push(p0.x-originX,(e0-baseElevation)*CONFIG.verticalScale+lift+0.45,p0.north-originNorth,p1.x-originX,(e1-baseElevation)*CONFIG.verticalScale+lift+0.45,p1.north-originNorth);
             for(let vertex=0;vertex<2;vertex++)outlineColors.push(color.r,color.g,color.b);
           }
         }
@@ -499,35 +538,72 @@ function addPolygonOverlay(scene, source, categoryValues, kind, values, mask, wi
   const layer = new THREE.Group(); layer.name = kind + "_polygon_layer";
   if (positions.length) {
     const geometry = new THREE.BufferGeometry(); geometry.setAttribute("position",new THREE.Float32BufferAttribute(positions,3)); geometry.setAttribute("color",new THREE.Float32BufferAttribute(colors,3)); geometry.setAttribute("featureId",new THREE.Float32BufferAttribute(featureIds,1)); geometry.setIndex(indices); geometry.computeBoundingSphere();
-    const mesh = new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide,transparent:true,opacity:kind === "risk" ? 0.42 : (kind === "buffer" ? 0.12 : 0.2),depthWrite:false,depthTest:true,toneMapped:false,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1}));
+    const mesh = new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide,transparent:true,opacity:kind === "risk" ? 0.58 : (kind === "buffer" ? 0.18 : 0.4),depthWrite:false,depthTest:true,toneMapped:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
+    mesh.renderOrder = 2;
     mesh.name = kind + "_fills"; layer.add(mesh);
   }
-  if (outlines.length) { const geometry=new THREE.BufferGeometry(); geometry.setAttribute("position",new THREE.Float32BufferAttribute(outlines,3)); geometry.setAttribute("color",new THREE.Float32BufferAttribute(outlineColors,3)); geometry.computeBoundingSphere(); layer.add(new THREE.LineSegments(geometry,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:1,depthTest:true,toneMapped:false}))); }
+  if (outlines.length) {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(outlines, 3));
+    geometry.setAttribute("color", new THREE.Float32BufferAttribute(outlineColors, 3));
+    geometry.computeBoundingSphere();
+    const lineMaterial = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 1, depthTest: true, depthWrite: false, toneMapped: false });
+    const lines = new THREE.LineSegments(geometry, lineMaterial); lines.renderOrder = 3; layer.add(lines);
+    addWideLineSegments(layer, geometry, { color: 0xffffff, width: kind === "buffer" ? 6 : 2.5, depthTest: true, renderOrder: 4 });
+  }
   layer.userData={featureCount:source.features.length,sourceRecordCount:source.recordCount,categoryCounts:counts,features:source.features,vertexCount:positions.length/3,triangleCount:indices.length/3,skippedTriangles,drawCalls:(positions.length?1:0)+(outlines.length?1:0),source:kind === "risk" ? CONFIG.riskUrl : kind === "threat" ? CONFIG.threatUrl : (kind === "buffer" ? CONFIG.bufferUrl : CONFIG.parcelsUrl),crs:"EPSG:9377",dbfField:categoryValues && categoryValues.fieldName};
   scene.add(layer); return layer;
 }
 
-function addParcelBoundaries(scene, source, values, mask, width, height, extent, originX, originNorth, baseElevation) {
-  const positions=[], featureIds=[], fillPositions=[], fillIds=[]; let count=0;
-  for(const feature of source.features) for(const part of buildingPolygonParts(feature)) {
-    const flat=[part.shell,...part.holes], points=flat.flat();
-    for(const ring of flat) for(let i=0;i<ring.length;i++) {
-      const a=ring[i],b=ring[(i+1)%ring.length],ea=sampleRenderedSurfaceElevation(a.x,a.north,values,mask,width,height,extent),eb=sampleRenderedSurfaceElevation(b.x,b.north,values,mask,width,height,extent);
-      if(ea===null||eb===null)continue;
-      positions.push(a.x-originX,(ea-baseElevation)*CONFIG.verticalScale+0.42,a.north-originNorth,b.x-originX,(eb-baseElevation)*CONFIG.verticalScale+0.42,b.north-originNorth);featureIds.push(feature.id,feature.id);
+async function addParcelBoundaries(scene, source, values, mask, width, height, extent, originX, originNorth, baseElevation) {
+  const positions = [], featureIds = [], fillPositions = [], fillIds = [];
+  let count = 0;
+  const lineLift = 1.8;
+  for (let featureIndex = 0; featureIndex < source.features.length; featureIndex++) {
+    const feature = source.features[featureIndex];
+    for (const part of buildingPolygonParts(feature)) {
+    const flat = [part.shell, ...part.holes], points = flat.flat();
+    for (const ring of flat) for (let i = 0; i < ring.length; i++) {
+      const a = ring[i], b = ring[(i + 1) % ring.length];
+      const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.north - a.north) / 2.5));
+      for (let step = 0; step < steps; step++) {
+        const t0 = step / steps, t1 = (step + 1) / steps;
+        const p0 = { x: a.x + (b.x - a.x) * t0, north: a.north + (b.north - a.north) * t0 };
+        const p1 = { x: a.x + (b.x - a.x) * t1, north: a.north + (b.north - a.north) * t1 };
+        const e0 = sampleRenderedSurfaceElevation(p0.x, p0.north, values, mask, width, height, extent);
+        const e1 = sampleRenderedSurfaceElevation(p1.x, p1.north, values, mask, width, height, extent);
+        if (e0 === null || e1 === null) continue;
+        positions.push(p0.x - originX, (e0 - baseElevation) * CONFIG.verticalScale + lineLift, p0.north - originNorth,
+          p1.x - originX, (e1 - baseElevation) * CONFIG.verticalScale + lineLift, p1.north - originNorth);
+        featureIds.push(feature.id, feature.id);
+      }
     }
-    const triangles=THREE.ShapeUtils.triangulateShape(part.shell.map(p=>new THREE.Vector2(p.x,p.north)),part.holes.map(r=>r.map(p=>new THREE.Vector2(p.x,p.north))));
-    const elevations=points.map(p=>sampleRenderedSurfaceElevation(p.x,p.north,values,mask,width,height,extent));
-    if(elevations.some(e=>e===null))continue;
-    for(const triangle of triangles) for(const index of triangle) { const p=points[index],e=elevations[index];fillPositions.push(p.x-originX,(e-baseElevation)*CONFIG.verticalScale+0.44,p.north-originNorth);fillIds.push(feature.id); }
+    const triangles = THREE.ShapeUtils.triangulateShape(part.shell.map(p => new THREE.Vector2(p.x, p.north)), part.holes.map(r => r.map(p => new THREE.Vector2(p.x, p.north))));
+    const elevations = points.map(p => sampleRenderedSurfaceElevation(p.x, p.north, values, mask, width, height, extent));
+    if (elevations.some(e => e === null)) continue;
+    for (const triangle of triangles) for (const index of triangle) {
+      const p = points[index], e = elevations[index];
+      fillPositions.push(p.x - originX, (e - baseElevation) * CONFIG.verticalScale + 0.44, p.north - originNorth);
+      fillIds.push(feature.id);
+    }
     count++;
+    }
+    if ((featureIndex & 31) === 31) await yieldToBrowser();
   }
-  const geometry=new THREE.BufferGeometry();geometry.setAttribute("position",new THREE.Float32BufferAttribute(positions,3));geometry.setAttribute("featureId",new THREE.Float32BufferAttribute(featureIds,1));
-  const fillGeometry=new THREE.BufferGeometry();fillGeometry.setAttribute("position",new THREE.Float32BufferAttribute(fillPositions,3));fillGeometry.setAttribute("featureId",new THREE.Float32BufferAttribute(fillIds,1));
-  const layer=new THREE.Group();layer.name="parcel_boundaries_layer";
-  const selectableFill=new THREE.Mesh(fillGeometry,new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,colorWrite:false,depthWrite:false,side:THREE.DoubleSide}));selectableFill.name="parcel_selection_surface";layer.add(selectableFill);
-  layer.add(new THREE.LineSegments(geometry,new THREE.LineBasicMaterial({color:0x47c4d1,transparent:true,opacity:0.8,depthTest:true,toneMapped:false})));
-  layer.userData={featureCount:source.features.length,sourceRecordCount:source.recordCount,ringCount:count,features:source.features,source:CONFIG.parcelsUrl,crs:"EPSG:9377",attributesLoaded:true};scene.add(layer);return layer;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("featureId", new THREE.Float32BufferAttribute(featureIds, 1));
+  const fillGeometry = new THREE.BufferGeometry();
+  fillGeometry.setAttribute("position", new THREE.Float32BufferAttribute(fillPositions, 3));
+  fillGeometry.setAttribute("featureId", new THREE.Float32BufferAttribute(fillIds, 1));
+  const layer = new THREE.Group(); layer.name = "parcel_boundaries_layer";
+  const selectableFill = new THREE.Mesh(fillGeometry, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, colorWrite: false, depthWrite: false, side: THREE.DoubleSide }));
+  selectableFill.name = "parcel_selection_surface"; layer.add(selectableFill);
+  const parcelLines = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: 0x00bcd4, transparent: true, opacity: 1, depthTest: true, depthWrite: false, toneMapped: false }));
+  parcelLines.renderOrder = 4; layer.add(parcelLines);
+  addWideLineSegments(layer, geometry, { color: 0x00bcd4, width: 2.5, depthTest: true, renderOrder: 5 });
+  layer.userData = { featureCount: source.features.length, sourceRecordCount: source.recordCount, ringCount: count, features: source.features, source: CONFIG.parcelsUrl, crs: "EPSG:9377", attributesLoaded: true };
+  scene.add(layer); return layer;
 }
 
 function appendBuildingExtrusion(feature, parts, positions, featureIds, floorCounts, estimatedHeights, outlines, vertexColors,
@@ -574,7 +650,7 @@ function appendBuildingExtrusion(feature, parts, positions, featureIds, floorCou
       if (normalY < 0) [indices[1], indices[2]] = [indices[2], indices[1]];
       const roof = indices.map(index => {
         const point = points[index];
-        return [point.x, (elevations[index] - baseElevation) * CONFIG.verticalScale + 0.25 + estimatedHeight * CONFIG.verticalScale, point.north];
+        return [point.x, (elevations[index] - baseElevation) * CONFIG.verticalScale + 1.2 + estimatedHeight * CONFIG.verticalScale, point.north];
       });
       pushTriangle(roof[0], roof[1], roof[2]);
     }
@@ -584,8 +660,8 @@ function appendBuildingExtrusion(feature, parts, positions, featureIds, floorCou
       for (let i = 0; i < ring.length; i++) {
         const next = (i + 1) % ring.length;
         const a = ring[i], b = ring[next];
-        const baseA = (elevations[ringOffset + i] - baseElevation) * CONFIG.verticalScale + 0.25;
-        const baseB = (elevations[ringOffset + next] - baseElevation) * CONFIG.verticalScale + 0.25;
+        const baseA = (elevations[ringOffset + i] - baseElevation) * CONFIG.verticalScale + 1.2;
+        const baseB = (elevations[ringOffset + next] - baseElevation) * CONFIG.verticalScale + 1.2;
         const topA = baseA + estimatedHeight * CONFIG.verticalScale;
         const topB = baseB + estimatedHeight * CONFIG.verticalScale;
         const bottomStart = [a.x, baseA, a.north], bottomEnd = [b.x, baseB, b.north];
@@ -645,7 +721,7 @@ function validateExtrusionSample(source, values, mask, width, height, extent, or
     for (const part of parts) for (const ring of [part.shell, ...part.holes]) for (const point of ring) {
       const ground = sampleRenderedSurfaceElevation(point.x, point.north, values, mask, width, height, extent);
       allowedCoordinates.set((point.x - originX).toFixed(4) + ":" + (point.north - originNorth).toFixed(4),
-        (ground - baseElevation) * CONFIG.verticalScale + 0.25);
+        (ground - baseElevation) * CONFIG.verticalScale + 1.2);
     }
     for (let vertex = 0; vertex < positions.length / 3; vertex++) {
       if (featureIds[vertex] !== feature.id || floors[vertex] !== feature.floorCount || heights[vertex] !== feature.estimatedHeight) {
@@ -662,14 +738,15 @@ function validateExtrusionSample(source, values, mask, width, height, extent, or
   return { records: sampleResults, count: sampleResults.length };
 }
 
-function addEstimatedBuildingVolumes(scene, source, values, mask, width, height, extent, originX, originNorth, baseElevation) {
+async function addEstimatedBuildingVolumes(scene, source, values, mask, width, height, extent, originX, originNorth, baseElevation) {
   const started = performance.now();
   const positions = [], featureIds = [], floorCounts = [], estimatedHeights = [], outlines = [], colors = [];
   const records = new Array(source.recordCount + 1);
   let volumeCount = 0, polygonCount = 0, holeCount = 0, triangleCount = 0;
   const riskCounts = {};
   const omitted = [];
-  for (const feature of source.features) {
+  for (let featureIndex = 0; featureIndex < source.features.length; featureIndex++) {
+    const feature = source.features[featureIndex];
     if (feature.heightStatus !== "estimated") continue;
     const parts = buildingPolygonParts(feature);
     const result = appendBuildingExtrusion(feature, parts, positions, featureIds, floorCounts, estimatedHeights, outlines, colors,
@@ -682,9 +759,7 @@ function addEstimatedBuildingVolumes(scene, source, values, mask, width, height,
     holeCount += result.holes;
     triangleCount += result.triangles;
     records[feature.id] = { recordId: feature.id, floorCount: feature.floorCount, basementCount: feature.basementCount, estimatedHeight: feature.estimatedHeight, heightStatus: feature.heightStatus, riskCategory: feature.riskCategory, threatCategory: feature.threatCategory, riskSymbol: riskSymbol(feature.riskCategory).key, polygons: result.polygons, holes: result.holes };
-  }
-  if (volumeCount !== 3268 || omitted.length) {
-    throw new Error("Se generaron " + volumeCount + " de los 3.268 volúmenes esperados. Registros omitidos: " + omitted.slice(0, 20).join(", ") + (omitted.length > 20 ? "…" : ""));
+    if ((featureIndex & 31) === 31) await yieldToBrowser();
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
@@ -697,6 +772,8 @@ function addEstimatedBuildingVolumes(scene, source, values, mask, width, height,
   const volume = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0, side: THREE.DoubleSide }));
   volume.name = "estimated_building_volumes_mesh";
   volume.userData.estimated = true;
+  volume.userData.estimatedCount = volumeCount;
+  volume.userData.omittedCount = omitted.length;
   const outlineGeometry = new THREE.BufferGeometry();
   outlineGeometry.setAttribute("position", new THREE.Float32BufferAttribute(outlines, 3));
   const outline = new THREE.LineSegments(outlineGeometry, new THREE.LineBasicMaterial({ color: 0x402b25, depthTest: true, toneMapped: false }));
@@ -704,6 +781,7 @@ function addEstimatedBuildingVolumes(scene, source, values, mask, width, height,
   const layer = new THREE.Group();
   layer.name = "estimated_buildings_layer";
   layer.add(volume, outline);
+  addWideLineSegments(layer, outlineGeometry, { color: 0x402b25, width: 2.5, depthTest: true, renderOrder: 4 });
   layer.userData = {
     featureCount: volumeCount,
     sourceFeatureCount: source.recordCount,
@@ -723,7 +801,7 @@ function addEstimatedBuildingVolumes(scene, source, values, mask, width, height,
     source: CONFIG.buildingsUrl,
     crs: "EPSG:9377",
     baseSampler: "same rendered DEM triangle interpolation as footprints",
-    baseOffsetMeters: 0.25
+    baseOffsetMeters: 1.2
   };
   scene.add(layer);
   return layer;
@@ -882,12 +960,28 @@ function createTerrainSkirt(values, mask, width, height, extent, originX, origin
   return skirt;
 }
 
-function enableLayerToggle(id, object) {
+function enableLayerToggle(id, object, buildOnDemand) {
   const input = document.getElementById(id);
   if (!input) return;
   input.disabled = false;
   object.visible = input.checked;
-  input.addEventListener("change", () => { object.visible = input.checked; });
+  input.addEventListener("change", async () => {
+    if (input.checked && buildOnDemand && !object.userData.ready) {
+      input.disabled = true;
+      setStatus("Preparando geometría 3D de esta capa…");
+      try {
+        await buildOnDemand();
+        object.userData.ready = true;
+      } catch (error) {
+        input.checked = false;
+        setStatus("No se pudo preparar esta capa: " + (error.message || error), "error");
+      } finally {
+        input.disabled = false;
+      }
+    }
+    object.visible = input.checked;
+    requestSceneRender();
+  });
 }
 
 function setupNavigationButtons(camera, controls) {
@@ -900,11 +994,11 @@ function setupNavigationButtons(camera, controls) {
     controls.update();
   };
   const reset = () => { camera.position.copy(homePosition); controls.target.copy(homeTarget); controls.update(); };
-  document.getElementById("nav-zoom-in")?.addEventListener("click", () => zoom(0.78));
-  document.getElementById("nav-zoom-out")?.addEventListener("click", () => zoom(1.28));
+  document.getElementById("nav-zoom-in")?.addEventListener("click", () => zoom(0.62));
+  document.getElementById("nav-zoom-out")?.addEventListener("click", () => zoom(1.5));
   document.getElementById("nav-reset")?.addEventListener("click", reset);
-  document.getElementById("touch-zoom-in")?.addEventListener("click", () => zoom(0.78));
-  document.getElementById("touch-zoom-out")?.addEventListener("click", () => zoom(1.28));
+  document.getElementById("touch-zoom-in")?.addEventListener("click", () => zoom(0.62));
+  document.getElementById("touch-zoom-out")?.addEventListener("click", () => zoom(1.5));
   document.getElementById("touch-reset")?.addEventListener("click", reset);
   window.addEventListener("keydown", event => { if (event.key === "Home" && !event.altKey && !event.ctrlKey && !event.metaKey) reset(); });
 }
@@ -923,7 +1017,7 @@ function setupFeatureSelection(scene, camera, renderer, controls, layers, surfac
   highlight.name = "selected_feature_highlight";
   scene.add(highlight);
   let active = false, pointerStart = null;
-  const layerLabels = { buildings: "Construccion", volumes: "Construccion 3D (altura estimada)", parcels: "Lote", risk: "Zona de riesgo", threat: "Zona de amenaza", buffer: "Buffer del area de estudio" };
+  const layerLabels = { buildings: "Construccion", volumes: "Construccion 3D (altura estimada)", parcels: "Predio", risk: "Zona de riesgo", threat: "Zona de amenaza", buffer: "Barrio de Manrique" };
   const fieldLabels = {
     fid_: "FID", cod_divipo: "Codigo DIVIPOLA", numero_pre: "Numero predial", matricula_: "Matricula", zona: "Zona", condicion_: "Condicion", destinacio: "Destinacion", tipo_predi: "Tipo de predio", shape_area: "Area registrada (m2)", cat_amenza: "Categoria de amenaza", cat_riesgo: "Categoria de riesgo",
     codigo: "Codigo", nombre: "Nombre", descripcio: "Descripcion", tipo_amena: "Tipo de amenaza", categoria_: "Categoria", subcategor: "Subcategoria", fecha_adop: "Fecha de adopcion", fecha_actu: "Fecha de actualizacion", objectid: "ObjectID", categoria: "Categoria", grado_amen: "Grado de amenaza",
@@ -935,6 +1029,7 @@ function setupFeatureSelection(scene, camera, renderer, controls, layers, surfac
       highlight.remove(child);
       child.geometry.dispose(); child.material.dispose();
     }
+    requestSceneRender();
   };
   const clearSelection = () => { clearHighlight(); inspector.hidden = true; rows.textContent = ""; hint.textContent = active ? "Pulsa otra entidad visible para consultar sus atributos." : "Activa la herramienta y pulsa una entidad visible para consultar sus atributos."; };
   const drawHighlight = feature => {
@@ -953,6 +1048,7 @@ function setupFeatureSelection(scene, camera, renderer, controls, layers, surfac
     const geometry = new THREE.BufferGeometry(); geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
     const material = new THREE.LineBasicMaterial({ color: 0x00e5ff, depthTest: false, toneMapped: false });
     highlight.add(new THREE.LineSegments(geometry, material));
+    requestSceneRender();
   };
   const showFeature = (layerConfig, feature) => {
     clearHighlight(); drawHighlight(feature);
@@ -1031,30 +1127,28 @@ function getDemExtent(width, height, world) {
 
 function validateManifest(manifest, extent) {
   if (manifest.crs !== "EPSG:9377") throw new Error("El manifiesto no declara EPSG:9377.");
-  if (!Array.isArray(manifest.tiles) || manifest.tiles.length !== 12) throw new Error("El manifiesto debe contener los 12 tiles.");
+  const rows = manifest.grid && manifest.grid.rows;
+  const columns = manifest.grid && manifest.grid.columns;
+  if (!Number.isInteger(rows) || !Number.isInteger(columns) || !Array.isArray(manifest.tiles) || manifest.tiles.length !== rows * columns) throw new Error("Incomplete ortho tile grid.");
   const imageExtent = manifest.sourceExtent;
-  const expected = new Set();
-  for (let row = 1; row <= 3; row++) {
-    for (let column = 1; column <= 4; column++) expected.add("ortho_r" + String(row).padStart(2, "0") + "_c" + String(column).padStart(2, "0") + ".jpg");
-  }
   for (const tile of manifest.tiles) {
-    if (!expected.has(tile.filename)) throw new Error("Nombre inesperado en tiles.json: " + tile.filename);
-    if (tile.width !== 1024 || tile.height !== 953) throw new Error("Dimensiones incorrectas en el manifiesto: " + tile.filename);
+    if (!/^ortho_r\d{2}_c\d{2}\.(?:jpg|tif)$/i.test(tile.filename)) throw new Error("Unexpected ortho tile filename: " + tile.filename);
+    if (!Number.isInteger(tile.width) || !Number.isInteger(tile.height) || tile.width < 1 || tile.height < 1) throw new Error("Invalid ortho tile dimensions: " + tile.filename);
     if (tile.bboxSR !== 9377 || tile.imageSR !== 9377) throw new Error("CRS incorrecto en el manifiesto: " + tile.filename);
     if (![tile.bbox.xmin, tile.bbox.ymin, tile.bbox.xmax, tile.bbox.ymax].every(Number.isFinite)) throw new Error("bbox inválido: " + tile.filename);
   }
-  for (let row = 1; row <= 3; row++) {
+  for (let row = 1; row <= rows; row++) {
     const tiles = manifest.tiles.filter(tile => tile.row === row).sort((a, b) => a.column - b.column);
-    if (tiles.length !== 4) throw new Error("La fila " + row + " no contiene cuatro tiles.");
-    if (!closeEnough(tiles[0].bbox.xmin, imageExtent.xmin) || !closeEnough(tiles[3].bbox.xmax, imageExtent.xmax)) throw new Error("La fila " + row + " no cubre la extensión de las texturas oeste-este.");
+    if (tiles.length !== columns) throw new Error("Incomplete ortho tile row: " + row);
+    if (!closeEnough(tiles[0].bbox.xmin, imageExtent.xmin) || !closeEnough(tiles[tiles.length - 1].bbox.xmax, imageExtent.xmax)) throw new Error("La fila " + row + " no cubre la extensión de las texturas oeste-este.");
     for (let i = 0; i < tiles.length - 1; i++) {
       if (!closeEnough(tiles[i].bbox.xmax, tiles[i + 1].bbox.xmin)) throw new Error("Hay un hueco o solapamiento entre columnas en la fila " + row + ".");
     }
   }
-  for (let column = 1; column <= 4; column++) {
+  for (let column = 1; column <= columns; column++) {
     const tiles = manifest.tiles.filter(tile => tile.column === column).sort((a, b) => a.row - b.row);
-    if (tiles.length !== 3) throw new Error("La columna " + column + " no contiene tres tiles.");
-    if (!closeEnough(tiles[0].bbox.ymax, imageExtent.ymax) || !closeEnough(tiles[2].bbox.ymin, imageExtent.ymin)) throw new Error("La columna " + column + " no cubre la extensión de las texturas norte-sur.");
+    if (tiles.length !== rows) throw new Error("Incomplete ortho tile column: " + column);
+    if (!closeEnough(tiles[0].bbox.ymax, imageExtent.ymax) || !closeEnough(tiles[tiles.length - 1].bbox.ymin, imageExtent.ymin)) throw new Error("La columna " + column + " no cubre la extensión de las texturas norte-sur.");
     for (let i = 0; i < tiles.length - 1; i++) {
       if (!closeEnough(tiles[i].bbox.ymin, tiles[i + 1].bbox.ymax)) throw new Error("Hay un hueco o solapamiento entre filas en la columna " + column + ".");
     }
@@ -1065,7 +1159,7 @@ function validateManifest(manifest, extent) {
     xmax: Math.min(extent.xmax, imageExtent.xmax),
     ymax: Math.min(extent.ymax, imageExtent.ymax)
   };
-  if (intersection.xmin >= intersection.xmax || intersection.ymin >= intersection.ymax) throw new Error("El DEM ZONA_ESTUDIO no se cruza con la extensión de las ortofotos.");
+  if (intersection.xmin >= intersection.xmax || intersection.ymin >= intersection.ymax) throw new Error("El DEM de Manrique no se cruza con la extensión de las ortofotos disponibles.");
   const demArea = (extent.xmax - extent.xmin) * (extent.ymax - extent.ymin);
   const coveredArea = (intersection.xmax - intersection.xmin) * (intersection.ymax - intersection.ymin);
   return { imageExtent, intersection, coverageRatio: coveredArea / demArea };
@@ -1227,9 +1321,19 @@ function clipToTile(polygon, bbox) {
 function buildTileGeometry(tile, values, mask, width, height, extent, originX, originNorth, baseElevation, focusBounds) {
   const gridWidth = width + 2;
   const gridHeight = height + 2;
+  const bounds = {
+    xmin: Math.max(tile.bbox.xmin, focusBounds.xmin, extent.xmin),
+    xmax: Math.min(tile.bbox.xmax, focusBounds.xmax, extent.xmax),
+    ymin: Math.max(tile.bbox.ymin, focusBounds.ymin, extent.ymin),
+    ymax: Math.min(tile.bbox.ymax, focusBounds.ymax, extent.ymax)
+  };
+  const iStart = Math.max(0, Math.floor((bounds.xmin - extent.xmin) / extent.pixelX + 0.5) - 1);
+  const iEnd = Math.min(gridWidth - 1, Math.ceil((bounds.xmax - extent.xmin) / extent.pixelX + 0.5) + 1);
+  const jStart = Math.max(0, Math.floor((extent.ymax - bounds.ymax) / extent.pixelY + 0.5) - 1);
+  const jEnd = Math.min(gridHeight - 1, Math.ceil((extent.ymax - bounds.ymin) / extent.pixelY + 0.5) + 1);
   const nodes = new Array(gridWidth * gridHeight);
-  for (let j = 0; j < gridHeight; j++) {
-    for (let i = 0; i < gridWidth; i++) {
+  for (let j = jStart; j <= jEnd; j++) {
+    for (let i = iStart; i <= iEnd; i++) {
       const column = Math.max(0, Math.min(width - 1, i - 1));
       const row = Math.max(0, Math.min(height - 1, j - 1));
       const sourceIndex = row * width + column;
@@ -1258,8 +1362,8 @@ function buildTileGeometry(tile, values, mask, width, height, extent, originX, o
     if (polygon.length < 3) return;
     for (let index = 1; index < polygon.length - 1; index++) pushTriangle(polygon[0], polygon[index], polygon[index + 1]);
   };
-  for (let j = 0; j < gridHeight - 1; j++) {
-    for (let i = 0; i < gridWidth - 1; i++) {
+  for (let j = jStart; j < jEnd; j++) {
+    for (let i = iStart; i < iEnd; i++) {
       const a = nodes[j * gridWidth + i];
       const b = nodes[j * gridWidth + i + 1];
       const c = nodes[(j + 1) * gridWidth + i];
@@ -1278,11 +1382,64 @@ function buildTileGeometry(tile, values, mask, width, height, extent, originX, o
   return { geometry, sourceQuads, triangles: positions.length / 9 };
 }
 
+function buildManriqueTerrainGeometry(values, mask, width, height, extent, originX, originNorth, baseElevation, imageBounds) {
+  const positions = [];
+  const colors = [];
+  const indices = [];
+  let elevationMaximum = baseElevation;
+  for (let index = 0; index < values.length; index++) if (!mask[index]) elevationMaximum = Math.max(elevationMaximum, values[index]);
+  const elevationRange = Math.max(1, elevationMaximum - baseElevation);
+  for (let row = 0; row < height; row++) {
+    for (let column = 0; column < width; column++) {
+      const index = row * width + column;
+      const elevation = mask[index] ? baseElevation : values[index];
+      const x = extent.xmin + column * extent.pixelX;
+      const north = extent.ymax - row * extent.pixelY;
+      positions.push(x - originX, (elevation - baseElevation) * CONFIG.verticalScale - 0.2, north - originNorth);
+      const t = Math.max(0, Math.min(1, (elevation - baseElevation) / elevationRange));
+      colors.push(0.28 + t * 0.20, 0.42 + t * 0.22, 0.30 + t * 0.12);
+    }
+  }
+  for (let row = 0; row < height - 1; row++) {
+    for (let column = 0; column < width - 1; column++) {
+      const a = row * width + column, b = a + 1, c = a + width, d = c + 1;
+      const centerX = extent.xmin + (column + 0.5) * extent.pixelX;
+      const centerNorth = extent.ymax - (row + 0.5) * extent.pixelY;
+      if (imageBounds.some(bounds => centerX >= bounds.xmin && centerX <= bounds.xmax && centerNorth >= bounds.ymin && centerNorth <= bounds.ymax)) continue;
+      if (!mask[a] && !mask[b] && !mask[c]) indices.push(a, c, b);
+      if (!mask[c] && !mask[b] && !mask[d]) indices.push(c, d, b);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
 async function loadTexture(loader, tile) {
   const url = new URL(tile.filename, new URL(CONFIG.textureFolderUrl, document.baseURI)).href;
   let texture;
   try {
-    texture = await loader.loadAsync(url);
+    if (/\.tif$/i.test(tile.filename)) {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      const tiff = await fromArrayBuffer(await response.arrayBuffer());
+      const image = await tiff.getImage();
+      const rgb = await image.readRGB({ interleave: true });
+      if (rgb.length !== image.getWidth() * image.getHeight() * 3) throw new Error("Unexpected TIFF RGB band layout.");
+      const canvas = document.createElement("canvas");
+      canvas.width = image.getWidth(); canvas.height = image.getHeight();
+      const context = canvas.getContext("2d", { alpha: false });
+      const pixels = context.createImageData(canvas.width, canvas.height);
+      for (let source = 0, target = 0; source < rgb.length; source += 3, target += 4) {
+        pixels.data[target] = rgb[source]; pixels.data[target + 1] = rgb[source + 1]; pixels.data[target + 2] = rgb[source + 2]; pixels.data[target + 3] = 255;
+      }
+      context.putImageData(pixels, 0, 0);
+      texture = new THREE.CanvasTexture(canvas);
+    } else texture = await loader.loadAsync(url);
   } catch (error) {
     throw new Error("Falló la textura " + tile.filename + " (" + url + "): " + (error && error.message ? error.message : error));
   }
@@ -1316,7 +1473,7 @@ async function initializeScene() {
   let rendererError;
   try {
     renderer = new THREE.WebGLRenderer({
-      antialias: true,
+      antialias: false,
       alpha: false,
       powerPreference: "low-power",
       failIfMajorPerformanceCaveat: false
@@ -1370,13 +1527,13 @@ async function initializeScene() {
   controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
   controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
   controls.rotateSpeed = 0.8;
-  controls.zoomSpeed = 1;
+  controls.zoomSpeed = 1.5;
   controls.panSpeed = 0.9;
   controls.zoomToCursor = true;
   controls.screenSpacePanning = true;
   controls.minPolarAngle = 0.12;
   controls.maxPolarAngle = Math.PI / 2 - 0.015;
-  controls.minDistance = 20;
+  controls.minDistance = 2;
   controls.maxDistance = 10000;
   const resize = () => {
     const w = container.clientWidth;
@@ -1386,6 +1543,8 @@ async function initializeScene() {
     camera.updateProjectionMatrix();
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, CONFIG.maxPixelRatio));
     renderer.setSize(w, h);
+    for (const material of wideLineMaterials) material.resolution.set(w, h);
+    requestSceneRender();
   };
   const observer = new ResizeObserver(resize);
   observer.observe(container);
@@ -1395,9 +1554,17 @@ async function initializeScene() {
     controls.dispose();
     renderer.dispose();
   }, { once: true });
-  const animate = () => {
+  let frameQueued = false;
+  const scheduleRender = () => {
+    if (frameQueued) return;
+    frameQueued = true;
     animationFrame = requestAnimationFrame(animate);
-    controls.update();
+  };
+  requestSceneRender = scheduleRender;
+  controls.addEventListener("change", scheduleRender);
+  const animate = () => {
+    frameQueued = false;
+    const cameraMoving = controls.update();
     camera.updateMatrixWorld();
     const north = northInView.set(0, 0, -1).transformDirection(camera.matrixWorldInverse);
     const northAngle = Math.atan2(north.x, north.y) * 180 / Math.PI;
@@ -1407,8 +1574,9 @@ async function initializeScene() {
       for (const label of compassCardinals.children) label.style.transform = "rotate(" + (-northAngle) + "deg)";
     }
     renderer.render(scene, camera);
+    if (cameraMoving) scheduleRender();
   };
-  animate();
+  scheduleRender();
   return { scene, camera, controls };
 }
 
@@ -1562,38 +1730,25 @@ async function main() {
     loadJson(CONFIG.manifestUrl).catch(error => { throw new Error("Fallo al cargar el manifiesto de ortofotos: " + error.message); }),
     loadWorldFile(CONFIG.worldFileUrl).catch(error => { throw new Error("Fallo al cargar la georreferencia del DEM: " + error.message); }),
     loadDem(CONFIG.demUrl).catch(error => { throw new Error("Fallo al cargar el DEM " + CONFIG.demUrl + ": " + (error && error.message ? error.message : error)); }),
-    loadBuildingFootprints(CONFIG.buildingsUrl, CONFIG.buildingsIndexUrl, CONFIG.buildingsProjectionUrl).catch(error => { throw new Error("Fallo al cargar geometrías de construcciones: " + (error && error.message ? error.message : error)); }),
-    loadBuildingAttributes(CONFIG.buildingsAttributesUrl, CONFIG.buildingsEncodingUrl).catch(error => { throw new Error("Fallo al cargar atributos de construcciones: " + (error && error.message ? error.message : error)); }),
-    loadBuildingFootprints(CONFIG.parcelsUrl, CONFIG.parcelsIndexUrl, CONFIG.parcelsProjectionUrl).catch(error => { throw new Error("Fallo al cargar geometrías de lotes: " + error.message); }),
-    loadParcelAttributes(CONFIG.parcelsAttributesUrl, CONFIG.parcelsEncodingUrl).catch(error => { throw new Error("Fallo al cargar atributos de lotes: " + error.message); }),
+    Promise.resolve({ features: [], recordCount: 0 }),
+    Promise.resolve({ records: [], recordCount: 0 }),
+    Promise.resolve({ features: [], recordCount: 0 }),
+    Promise.resolve({ records: [], recordCount: 0 }),
     loadBuildingFootprints(CONFIG.riskUrl, CONFIG.riskIndexUrl, CONFIG.riskProjectionUrl).catch(error => { throw new Error("Fallo al cargar geometrías de riesgo: " + error.message); }),
     loadCategoryAttributes(CONFIG.riskAttributesUrl, CONFIG.riskEncodingUrl, "riesgo", ["codigo", "nombre", "descripcio", "tipo_amena", "categoria_", "subcategor", "fecha_adop", "fecha_actu", "shape_area"]).catch(error => { throw new Error("Fallo al cargar categorías de riesgo: " + error.message); }),
     loadBuildingFootprints(CONFIG.threatUrl, CONFIG.threatIndexUrl, CONFIG.threatProjectionUrl).catch(error => { throw new Error("Fallo al cargar geometrías de amenaza: " + error.message); }),
     loadCategoryAttributes(CONFIG.threatAttributesUrl, CONFIG.threatEncodingUrl, "grado_amen", ["objectid", "codigo", "categoria", "categoria_", "subcategor", "fecha_adop", "fecha_actu"]).catch(error => { throw new Error("Fallo al cargar categorías de amenaza: " + error.message); }),
     loadBuildingFootprints(CONFIG.bufferUrl, CONFIG.bufferIndexUrl, CONFIG.bufferProjectionUrl).catch(error => { throw new Error("Fallo al cargar el buffer del area de estudio: " + error.message); }),
   ]);
-  if (buildingSource.recordCount !== 3308 || buildingSource.features.length !== 3308 || buildingAttributes.recordCount !== buildingSource.recordCount) {
-    throw new Error("SHP/SHPX/DBF no tienen los mismos 3.308 registros activos: SHP " + buildingSource.recordCount + ", geometrías " + buildingSource.features.length + ", DBF " + buildingAttributes.recordCount + ".");
-  }
-  for (const feature of buildingSource.features) {
-    const attributes = buildingAttributes.records[feature.id - 1];
-    if (!attributes || attributes.recordId !== feature.id) throw new Error("No se pudo relacionar el registro geométrico " + feature.id + " con su fila DBF.");
-    Object.assign(feature, attributes);
-  }
-  if (parcelSource.recordCount !== 1540 || parcelSource.features.length !== 1540 || parcelAttributes.recordCount !== parcelSource.recordCount) throw new Error("La capa de lotes no contiene los 1.540 polígonos y filas DBF esperados.");
-  for (let index = 0; index < parcelSource.features.length; index++) Object.assign(parcelSource.features[index], parcelAttributes.records[index]);
-  for (const [name, source, attributes, expected] of [["riesgo", riskSource, riskAttributes, 19], ["amenaza", threatSource, threatAttributes, 9]]) {
-    if (source.recordCount !== expected || source.features.length !== expected || attributes.recordCount !== expected) throw new Error("SHP/SHX/DBF de " + name + " no coinciden con los " + expected + " registros esperados.");
+  for (const [name, source, attributes] of [["riesgo", riskSource, riskAttributes], ["amenaza", threatSource, threatAttributes]]) {
+    if (source.recordCount !== attributes.recordCount) throw new Error("SHP/SHX/DBF de " + name + " tienen diferente número de registros.");
     for (let index = 0; index < source.features.length; index++) Object.assign(source.features[index], attributes.records[index]);
   }
-  if (buildingAttributes.estimatedCount !== 3268 || buildingAttributes.zeroCount !== 40) {
-    throw new Error("La auditoría DBF encontró " + buildingAttributes.estimatedCount + " filas con pisos y " + buildingAttributes.zeroCount + " filas sin pisos; se esperaban 3.268 y 40.");
-  }
-  if (bufferSource.recordCount !== 1 || bufferSource.features.length !== 1) throw new Error("Bff_Uva debe contener un poligono de buffer.");
+  if (!bufferSource.features.length) throw new Error("La capa de barrios no contiene polígonos para encuadrar Manrique.");
   const image = await tiff.getImage();
   const width = image.getWidth();
   const height = image.getHeight();
-  if (width !== 205 || height !== 144) throw new Error("El DEM ZONA_ESTUDIO tiene dimensiones inesperadas: " + width + " × " + height + ".");
+  if (width < 100 || height < 100) throw new Error("El DEM de Manrique tiene dimensiones inesperadas: " + width + " × " + height + ".");
   const extent = getDemExtent(width, height, world);
   const focusBounds = focusBoundsFromFeatures(bufferSource, CONFIG.focusMarginMeters, extent);
   const textureCoverage = validateManifest(manifest, extent);
@@ -1614,79 +1769,119 @@ async function main() {
   if (analysis.validCount === 0) throw new Error("El DEM no contiene valores de elevación válidos.");
   const displaySurface = createDisplaySurface(elevations, analysis.mask, width, height);
   setStatus("DEM leído: " + width + " × " + height + " celdas. Analizando NoData antes de crear la superficie…", analysis.missingCount ? "warning" : "info");
-  const worldCrs = Math.abs(extent.pixelX - 10) < 1e-6 && Math.abs(extent.pixelY - 10) < 1e-6;
-  if (!worldCrs) throw new Error("La resolución del DEM no es 10 × 10 m según el TFW.");
+  if (Math.abs(extent.pixelX - 5) > 1e-6 || Math.abs(extent.pixelY - 5) > 1e-6) throw new Error("La resolución del DEM de Manrique no es de 5 m según el TFW.");
   const originX = (extent.xmin + extent.xmax) / 2;
   const originNorth = (extent.ymin + extent.ymax) / 2;
   const baseElevation = analysis.minimum;
   const textureLoader = new THREE.TextureLoader();
   const tiles = manifest.tiles.filter(tile =>
-    tile.bbox.xmax > focusBounds.xmin && tile.bbox.xmin < focusBounds.xmax &&
-    tile.bbox.ymax > focusBounds.ymin && tile.bbox.ymin < focusBounds.ymax
+    tile.bbox.xmax > extent.xmin && tile.bbox.xmin < extent.xmax &&
+    tile.bbox.ymax > extent.ymin && tile.bbox.ymin < extent.ymax
   ).sort((a, b) => a.row - b.row || a.column - b.column);
   if (!tiles.length) throw new Error("Ninguna tesela de ortofoto intersecta el entorno del área de estudio.");
   const textures = new Map();
   let loadedTextures = 0;
-  await Promise.all(tiles.map(async tile => {
+  for (const tile of tiles) {
     const texture = await loadTexture(textureLoader, tile);
     textures.set(tile.filename, texture);
     loadedTextures++;
     setStatus("Cargando ortofoto optimizada: " + loadedTextures + " de " + tiles.length + " teselas…");
-  }));
-  setStatus("Texturas cargadas. Construyendo malla y recortando los parches en sus límites geográficos…");
-  const gridWidth = width + 2;
-  const gridHeight = height + 2;
-  let validSurfaceQuads = 0;
-  for (let j = 0; j < gridHeight - 1; j++) {
-    for (let i = 0; i < gridWidth - 1; i++) {
-      const cells = [
-        [Math.max(0, Math.min(height - 1, j - 1)), Math.max(0, Math.min(width - 1, i - 1))],
-        [Math.max(0, Math.min(height - 1, j - 1)), Math.max(0, Math.min(width - 1, i))],
-        [Math.max(0, Math.min(height - 1, j)), Math.max(0, Math.min(width - 1, i - 1))],
-        [Math.max(0, Math.min(height - 1, j)), Math.max(0, Math.min(width - 1, i))]
-      ];
-      if (cells.every(([row, column]) => !analysis.mask[row * width + column])) validSurfaceQuads++;
-    }
   }
+  setStatus("Texturas cargadas. Construyendo malla y recortando los parches en sus límites geográficos…");
   let renderedTriangles = 0;
   const materials = [];
   const terrainLayer = new THREE.Group();
   terrainLayer.name = "terrain_and_orthophoto_layer";
+  const fullAreaGeometry = buildManriqueTerrainGeometry(displaySurface.values, displaySurface.mask, width, height, extent, originX, originNorth, baseElevation, tiles.map(tile => tile.bbox));
+  const fullAreaMesh = new THREE.Mesh(fullAreaGeometry, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 2 }));
+  fullAreaMesh.name = "terrain_manrique_5m";
+  terrainLayer.add(fullAreaMesh);
+  renderedTriangles += fullAreaGeometry.index.count / 3;
   for (const tile of tiles) {
-    const result = buildTileGeometry(tile, displaySurface.values, displaySurface.mask, width, height, extent, originX, originNorth, baseElevation, focusBounds);
+    const result = buildTileGeometry(tile, displaySurface.values, displaySurface.mask, width, height, extent, originX, originNorth, baseElevation, extent);
     renderedTriangles += result.triangles;
-    const material = new THREE.MeshStandardMaterial({ map: textures.get(tile.filename), roughness: 1, metalness: 0, side: THREE.DoubleSide });
+    const material = new THREE.MeshStandardMaterial({ map: textures.get(tile.filename), roughness: 1, metalness: 0, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
     const mesh = new THREE.Mesh(result.geometry, material);
+    mesh.renderOrder = 1;
     mesh.name = "terrain_" + tile.filename.replace(".jpg", "");
     mesh.userData = { filename: tile.filename, bbox: tile.bbox, row: tile.row, column: tile.column };
     terrainLayer.add(mesh);
     materials.push(material);
   }
-  const terrainSkirt = createTerrainSkirt(displaySurface.values, displaySurface.mask, width, height, extent, originX, originNorth, baseElevation, CONFIG.terrainSkirtDepthMeters, focusBounds);
+  const terrainSkirt = createTerrainSkirt(displaySurface.values, displaySurface.mask, width, height, extent, originX, originNorth, baseElevation, CONFIG.terrainSkirtDepthMeters, extent);
   terrainLayer.add(terrainSkirt);
   scene.add(terrainLayer);
   const bufferLayer = addPolygonOverlay(scene, bufferSource, null, "buffer", elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
-  const extrusionSample = validateExtrusionSample(buildingSource, elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
-  const buildingLayer = addBuildingFootprints(scene, buildingSource, elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
-  const estimatedBuildingLayer = addEstimatedBuildingVolumes(scene, buildingSource, elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
-  const parcelLayer = addParcelBoundaries(scene, parcelSource, elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
+  const extrusionSample = null;
+  const buildingLayer = new THREE.Group(); buildingLayer.name = "building_footprints_layer"; scene.add(buildingLayer);
+  const estimatedBuildingLayer = new THREE.Group(); estimatedBuildingLayer.name = "estimated_building_volumes_layer"; scene.add(estimatedBuildingLayer);
+  const parcelLayer = new THREE.Group(); parcelLayer.name = "parcel_boundaries_layer"; scene.add(parcelLayer);
+  const buildingFeatures = new Map(), parcelFeatures = new Map();
+  let buildingLoadPromise = null, parcelLoadPromise = null;
+  const movePreparedLayer = (target, prepared) => {
+    scene.remove(prepared);
+    while (prepared.children.length) target.add(prepared.children[0]);
+    target.userData = prepared.userData;
+  };
+  const ensureBuildings = async () => {
+    if (!buildingLoadPromise) buildingLoadPromise = Promise.all([
+      loadBuildingFootprints(CONFIG.buildingsUrl, CONFIG.buildingsIndexUrl, CONFIG.buildingsProjectionUrl),
+      loadBuildingAttributes(CONFIG.buildingsAttributesUrl, CONFIG.buildingsEncodingUrl)
+    ]).then(([source, attributes]) => {
+      if (attributes.recordCount !== source.recordCount) throw new Error("El DBF y el SHP de construcciones tienen diferente número de registros.");
+      for (const feature of source.features) {
+        const row = attributes.records[feature.id - 1];
+        if (!row || row.recordId !== feature.id) throw new Error("No se pudo relacionar la geometría de construcción " + feature.id + " con sus atributos.");
+        Object.assign(feature, row); buildingFeatures.set(feature.id, feature);
+      }
+      buildingSource.features = source.features; buildingSource.recordCount = source.recordCount;
+      buildingAttributes.records = attributes.records; buildingAttributes.recordCount = attributes.recordCount;
+    });
+    await buildingLoadPromise;
+  };
+  const buildFootprintsOnDemand = async () => {
+    await ensureBuildings();
+    const prepared = await addBuildingFootprints(scene, buildingSource, elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
+    movePreparedLayer(buildingLayer, prepared);
+  };
+  const buildVolumesOnDemand = async () => {
+    await ensureBuildings();
+    const prepared = await addEstimatedBuildingVolumes(scene, buildingSource, elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
+    movePreparedLayer(estimatedBuildingLayer, prepared);
+  };
+  const buildParcelsOnDemand = async () => {
+    if (!parcelLoadPromise) parcelLoadPromise = Promise.all([
+      loadBuildingFootprints(CONFIG.parcelsUrl, CONFIG.parcelsIndexUrl, CONFIG.parcelsProjectionUrl),
+      loadParcelAttributes(CONFIG.parcelsAttributesUrl, CONFIG.parcelsEncodingUrl)
+    ]).then(([source, attributes]) => {
+      if (attributes.recordCount !== source.recordCount) throw new Error("El DBF y el SHP predial tienen diferente número de registros.");
+      for (let index = 0; index < source.features.length; index++) {
+        Object.assign(source.features[index], attributes.records[index]); parcelFeatures.set(source.features[index].id, source.features[index]);
+      }
+      parcelSource.features = source.features; parcelSource.recordCount = source.recordCount;
+      parcelAttributes.records = attributes.records; parcelAttributes.recordCount = attributes.recordCount;
+    });
+    await parcelLoadPromise;
+    const prepared = await addParcelBoundaries(scene, parcelSource, elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
+    movePreparedLayer(parcelLayer, prepared);
+  };
   const riskLayer = addPolygonOverlay(scene, riskSource, riskAttributes, "risk", elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
   const threatLayer = addPolygonOverlay(scene, threatSource, threatAttributes, "threat", elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
   const focusClipPlanes = applySceneFocusClip(scene, focusBounds, originX, originNorth, terrainLayer);
   enableLayerToggle("layer-terrain", terrainLayer);
   enableLayerToggle("layer-buffer", bufferLayer);
-  enableLayerToggle("layer-buildings", buildingLayer);
-  enableLayerToggle("layer-building-volumes", estimatedBuildingLayer);
-  enableLayerToggle("layer-parcels", parcelLayer);
+  enableLayerToggle("layer-buildings", buildingLayer, buildFootprintsOnDemand);
+  enableLayerToggle("layer-building-volumes", estimatedBuildingLayer, buildVolumesOnDemand);
+  enableLayerToggle("layer-parcels", parcelLayer, buildParcelsOnDemand);
   enableLayerToggle("layer-risk", riskLayer);
   enableLayerToggle("layer-threat", threatLayer);
   const selectionLayers = [
-    { key: "buildings", layer: buildingLayer, source: "Construcciones_Area_Estudio", features: new Map(buildingSource.features.map(feature => [feature.id, feature])), enabled: () => document.getElementById("layer-buildings").checked },
-    { key: "volumes", layer: estimatedBuildingLayer, source: "Construcciones_Area_Estudio", features: new Map(buildingSource.features.map(feature => [feature.id, feature])), enabled: () => document.getElementById("layer-building-volumes").checked },
-    { key: "parcels", layer: parcelLayer, source: "Predios_Influencia", features: new Map(parcelSource.features.map(feature => [feature.id, feature])), enabled: () => document.getElementById("layer-parcels").checked },
+    { key: "buildings", layer: buildingLayer, source: "Contrucciones_Manrique", features: buildingFeatures, enabled: () => document.getElementById("layer-buildings").checked },
+    { key: "volumes", layer: estimatedBuildingLayer, source: "Contrucciones_Manrique", features: buildingFeatures, enabled: () => document.getElementById("layer-building-volumes").checked },
+    { key: "parcels", layer: parcelLayer, source: "Predios", features: parcelFeatures, enabled: () => document.getElementById("layer-parcels").checked },
     { key: "risk", layer: riskLayer, source: "RIESGO_MOV_MASA", features: new Map(riskSource.features.map(feature => [feature.id, feature])), enabled: () => document.getElementById("layer-risk").checked },
     { key: "threat", layer: threatLayer, source: "Amenaza_Mov_Masa", features: new Map(threatSource.features.map(feature => [feature.id, feature])), enabled: () => document.getElementById("layer-threat").checked },
-    { key: "buffer", layer: bufferLayer, source: "Bff_Uva", features: new Map(bufferSource.features.map(feature => [feature.id, feature])), enabled: () => document.getElementById("layer-buffer").checked }
+    { key: "buffer", layer: bufferLayer, source: "Barrios", features: new Map(bufferSource.features.map(feature => [feature.id, feature])), enabled: () => document.getElementById("layer-buffer").checked }
   ];
   setupFeatureSelection(scene, camera, renderer, controls, selectionLayers, { sampleArgs: [displaySurface.values, displaySurface.mask, width, height, extent], originX, originNorth, baseElevation });
   if (!renderedTriangles) throw new Error("No se generaron triángulos válidos; revise la máscara NoData del DEM.");
@@ -1700,10 +1895,12 @@ async function main() {
   camera.lookAt(center);
   camera.updateProjectionMatrix();
   controls.update();
+  requestSceneRender();
   setupNavigationButtons(camera, controls);
   const uncoveredNorth = Math.max(0, extent.ymax - textureCoverage.imageExtent.ymax);
-  setStatus("Terreno listo: " + buildingLayer.userData.featureCount.toLocaleString("es-CO") + " huellas, " + estimatedBuildingLayer.userData.featureCount.toLocaleString("es-CO") + " volúmenes estimados y " + estimatedBuildingLayer.userData.flatFootprintCount + " huellas sin volumen.", uncoveredNorth > CONFIG.extentToleranceMeters ? "warning" : "info");
-  const estimateNote = document.querySelector(".estimate-note"); if (estimateNote) estimateNote.textContent = "Buffer de 270 m alrededor del area de influencia de la UVA La Armonia. Alturas estimadas: 2,10 m por piso; no son mediciones verificadas.";
+  const textureCoveragePercent = Math.round(textureCoverage.coverageRatio * 100);
+  setStatus("Terreno listo. Ortofoto: " + textureCoveragePercent + "% del DEM. Las construcciones se cargan al activar su capa.", textureCoveragePercent < 99 ? "warning" : "info");
+  const estimateNote = document.querySelector(".estimate-note"); if (estimateNote) estimateNote.textContent = "Alturas estimadas a 2,10 m por piso; son aproximaciones, no mediciones verificadas.";
   window.__terrain3d = { scene, camera, controls, renderer, textureCount: textures.size, validElevationCount: analysis.validCount, nodataCount: analysis.missingCount, nodataComponents: analysis.components, renderedTriangles, patchCount: tiles.length, focusBounds, focusClipPlanes, terrainSkirt, buildingLayer, estimatedBuildingLayer, parcelLayer, riskLayer, threatLayer, buildingRecordCount: buildingSource.recordCount, buildingAttributeCount: buildingAttributes.recordCount, parcelRecordCount: parcelSource.recordCount, riskRecordCount: riskSource.recordCount, threatRecordCount: threatSource.recordCount, extrusionSample, verticalScale: CONFIG.verticalScale };
   document.getElementById("download-map-pdf").disabled = false;
 }

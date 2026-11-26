@@ -1,0 +1,91 @@
+﻿{
+    "service":  "https://www.medellin.gov.co/servidormapas/rest/services/ServiciosImagen/Ortofoto_Medellin_2024/ImageServer/exportImage",
+    "crs":  "EPSG:9377",
+    "grid":  {
+                 "columns":  2,
+                 "rows":  2
+             },
+    "sourceExtent":  {
+                         "xmin":  4717308.3505090969,
+                         "ymin":  2251202.1555796824,
+                         "xmax":  4719848.3505090969,
+                         "ymax":  2253122.1555796824
+                     },
+    "sourceResolutionMetersPerPixel":  0.5,
+    "format":  "GeoTIFF with JPEG compression",
+    "compressionQuality":  80,
+    "tiles":  [
+                  {
+                      "index":  1,
+                      "row":  1,
+                      "column":  1,
+                      "filename":  "ortho_r01_c01.tif",
+                      "bbox":  {
+                                   "xmin":  4717308.3505090969,
+                                   "ymin":  2252162.1555796824,
+                                   "xmax":  4718578.3505090969,
+                                   "ymax":  2253122.1555796824
+                               },
+                      "bboxSR":  9377,
+                      "imageSR":  9377,
+                      "width":  2540,
+                      "height":  1920,
+                      "resolutionMetersPerPixel":  0.5,
+                      "format":  "tiff-jpeg"
+                  },
+                  {
+                      "index":  2,
+                      "row":  1,
+                      "column":  2,
+                      "filename":  "ortho_r01_c02.tif",
+                      "bbox":  {
+                                   "xmin":  4718578.3505090969,
+                                   "ymin":  2252162.1555796824,
+                                   "xmax":  4719848.3505090969,
+                                   "ymax":  2253122.1555796824
+                               },
+                      "bboxSR":  9377,
+                      "imageSR":  9377,
+                      "width":  2540,
+                      "height":  1920,
+                      "resolutionMetersPerPixel":  0.5,
+                      "format":  "tiff-jpeg"
+                  },
+                  {
+                      "index":  3,
+                      "row":  2,
+                      "column":  1,
+                      "filename":  "ortho_r02_c01.tif",
+                      "bbox":  {
+                                   "xmin":  4717308.3505090969,
+                                   "ymin":  2251202.1555796824,
+                                   "xmax":  4718578.3505090969,
+                                   "ymax":  2252162.1555796824
+                               },
+                      "bboxSR":  9377,
+                      "imageSR":  9377,
+                      "width":  2540,
+                      "height":  1920,
+                      "resolutionMetersPerPixel":  0.5,
+                      "format":  "tiff-jpeg"
+                  },
+                  {
+                      "index":  4,
+                      "row":  2,
+                      "column":  2,
+                      "filename":  "ortho_r02_c02.tif",
+                      "bbox":  {
+                                   "xmin":  4718578.3505090969,
+                                   "ymin":  2251202.1555796824,
+                                   "xmax":  4719848.3505090969,
+                                   "ymax":  2252162.1555796824
+                               },
+                      "bboxSR":  9377,
+                      "imageSR":  9377,
+                      "width":  2540,
+                      "height":  1920,
+                      "resolutionMetersPerPixel":  0.5,
+                      "format":  "tiff-jpeg"
+                  }
+              ]
+}
