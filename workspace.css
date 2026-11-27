@@ -15,6 +15,7 @@
 .sidebar-resize-handle:active{background:#c5dce5}
 .layer-symbology-toggle{flex:0 0 auto;max-width:92px;padding:5px 6px;border:1px solid #34353b;border-radius:6px;background:#18191d;color:#c9cbd2;font-size:8px;line-height:1.2;cursor:pointer}
 .layer-symbology-toggle[aria-pressed="true"]{border-color:#a855f7;background:#211629;color:#e0c4f8}
+.cadastral-template-frame{display:block;width:100%;height:min(76dvh,1100px);border:0;background:#cbd5e1}
 .map-navigation{z-index:900;pointer-events:auto}
 .map-navigation button{pointer-events:auto;touch-action:manipulation}
 @media(max-width:620px){.workspace-tabs{top:0;padding:8px 10px}.workspace-tab{min-height:42px;font-size:9px}}

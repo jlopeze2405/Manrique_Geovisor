@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="workspace.css?v=territorial-address-1">
+  <link rel="stylesheet" href="workspace.css?v=cadastral-template-2">
 </head>
 <body>
   <main class="app-shell">
@@ -191,7 +191,7 @@
       <div class="map-status"><div class="coordinate-readout"><span class="status-label">COORDENADAS · EPSG:4326</span><strong id="coordinates">Mueve el cursor sobre el mapa</strong><small id="crs-indicator">Mapa EPSG:3857 · Datos fuente EPSG:9377</small></div><div class="status-divider"></div><div class="zoom-readout"><span class="status-label">NIVEL DE ZOOM</span><strong id="zoom-level">—</strong></div></div>
     </section>
     <dialog id="cadastral-sheet-dialog" class="cadastral-sheet-dialog" aria-labelledby="cadastral-sheet-title">
-      <header class="cadastral-sheet-toolbar"><strong>Ficha Catastral Simplificada</strong><div><button id="cadastral-sheet-print" type="button" class="secondary-action">Imprimir / Guardar PDF</button><button id="cadastral-sheet-close" type="button" class="icon-button" aria-label="Cerrar ficha">×</button></div></header>
+      <header class="cadastral-sheet-toolbar"><strong id="cadastral-sheet-title">Ficha Catastral Simplificada</strong><div><button id="cadastral-sheet-print" type="button" class="secondary-action">Imprimir / Guardar PDF</button><button id="cadastral-sheet-close" type="button" class="icon-button" aria-label="Cerrar ficha">×</button></div></header>
       <article id="cadastral-sheet-content" class="cadastral-sheet-content"></article>
     </dialog>
     <dialog id="csv-import-dialog" class="metadata-dialog"><form id="csv-import-form" method="dialog"><button class="dialog-close" value="cancel" aria-label="Cerrar">×</button><h2>Importar CSV de coordenadas</h2><p>Elige las columnas X/Y y el CRS de origen. Las coordenadas se transformarán a WGS 84 para mostrarlas.</p><label class="filter-field">Columna X / longitud<select id="csv-x-column" required></select></label><label class="filter-field">Columna Y / latitud<select id="csv-y-column" required></select></label><label class="filter-field">Sistema de coordenadas<select id="csv-crs"><option value="4326">EPSG:4326 · WGS 84</option><option value="3116">EPSG:3116 · MAGNA-SIRGAS / Bogotá</option><option value="9377">EPSG:9377 · MAGNA-SIRGAS 2018 / Origen-Nacional</option></select></label><div class="csv-import-actions"><button value="cancel" type="submit">Cancelar</button><button id="csv-import-confirm" value="import" type="submit">Importar puntos</button></div></form></dialog>
@@ -216,7 +216,7 @@
     <script src="https://unpkg.com/shpjs@6.2.0/dist/shp.js"></script>
     <script src="https://unpkg.com/georaster@1.6.0/dist/georaster.browser.bundle.min.js"></script>
     <script src="https://unpkg.com/georaster-layer-for-leaflet@3.10.0/dist/georaster-layer-for-leaflet.min.js"></script>
-    <script src="scripts.js?v=territorial-address-1"></script>
+    <script src="scripts.js?v=cadastral-template-2"></script>
 
 </body>
 </html>

@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ficha Catastral Simplificada - {{CBML}}</title>
+  <style>
+    :root {
+      --primary: #1e293b;
+      --secondary: #475569;
+      --border: #94a3b8;
+      --bg-header: #e2e8f0;
+      --bg-sub: #f8fafc;
+      --accent: #0f766e;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #0f172a;
+      background: #cbd5e1;
+      padding: 20px;
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .toolbar {
+      max-width: 215.9mm;
+      margin: 0 auto 12px auto;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .btn {
+      padding: 8px 14px;
+      border: none;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-print {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .btn-close {
+      background: #475569;
+      color: #fff;
+    }
+
+    .sheet {
+      width: 215.9mm;
+      min-height: 279.4mm;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 12mm;
+      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.15);
+    }
+
+    /* Encabezado técnico neutro */
+    .doc-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1.5px solid var(--primary);
+      padding: 8px 12px;
+      margin-bottom: 8px;
+      background: var(--bg-sub);
+    }
+
+    .doc-title h1 {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      color: var(--primary);
+      text-transform: uppercase;
+    }
+
+    .doc-title p {
+      font-size: 10px;
+      color: var(--secondary);
+      margin-top: 2px;
+    }
+
+    .doc-meta {
+      text-align: right;
+      font-size: 10px;
+    }
+
+    .doc-meta div {
+      margin-bottom: 2px;
+    }
+
+    .badge-cbml {
+      display: inline-block;
+      background: var(--primary);
+      color: #fff;
+      padding: 3px 8px;
+      font-weight: 700;
+      font-size: 11px;
+      border-radius: 3px;
+      letter-spacing: 0.5px;
+    }
+
+    /* Tablas de información */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 8px;
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 4px 6px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .section-title {
+      background: var(--primary);
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 5px 8px;
+    }
+
+    .sub-header {
+      background: var(--bg-header);
+      font-weight: 700;
+      font-size: 9.5px;
+      color: var(--primary);
+      text-transform: uppercase;
+    }
+
+    .field-label {
+      font-size: 8.5px;
+      font-weight: 700;
+      color: var(--secondary);
+      text-transform: uppercase;
+      display: block;
+      margin-bottom: 1px;
+    }
+
+    .field-value {
+      font-size: 10.5px;
+      font-weight: 600;
+      color: #0f172a;
+      min-height: 14px;
+    }
+
+    .text-center { text-align: center; }
+    .text-right { text-align: right; }
+
+    /* Sección Planimétrica */
+    .planimetric-grid {
+      display: grid;
+      grid-template-columns: 1.45fr 1fr;
+      gap: 8px;
+      border: 1px solid var(--border);
+      padding: 8px;
+      margin-bottom: 8px;
+    }
+
+    .map-box {
+      border: 1px solid var(--border);
+      background: #ffffff;
+      position: relative;
+      min-height: 250px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .map-canvas-container {
+      width: 100%;
+      height: 235px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .map-canvas-container svg,
+    .map-canvas-container canvas {
+      max-width: 100%;
+      max-height: 100%;
+    }
+
+    .map-footer {
+      border-top: 1px solid var(--border);
+      background: var(--bg-sub);
+      padding: 4px 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 9px;
+      color: var(--secondary);
+    }
+
+    .coords-panel {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .coords-table th,
+    .coords-table td {
+      font-size: 9px;
+      padding: 3px 4px;
+      text-align: center;
+    }
+
+    .legend-box {
+      border: 1px solid var(--border);
+      padding: 6px;
+      background: var(--bg-sub);
+      font-size: 9px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 3px;
+    }
+
+    .sym-lot {
+      width: 16px;
+      height: 10px;
+      border: 2px solid #dc2626;
+      background: rgba(220, 38, 38, 0.08);
+    }
+
+    .sym-const {
+      width: 16px;
+      height: 10px;
+      border: 1px solid #16a34a;
+      background: repeating-linear-gradient(
+        45deg,
+        #16a34a,
+        #16a34a 2px,
+        transparent 2px,
+        transparent 5px
+      );
+    }
+
+    .sym-vertex {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ea580c;
+      margin: 0 4px;
+    }
+
+    .doc-disclaimer {
+      border: 1px dashed var(--border);
+      padding: 6px 8px;
+      font-size: 9px;
+      color: var(--secondary);
+      background: var(--bg-sub);
+    }
+
+    @media print {
+      body {
+        background: none;
+        padding: 0;
+      }
+      .toolbar {
+        display: none !important;
+      }
+      .sheet {
+        box-shadow: none;
+        margin: 0;
+        width: 100%;
+        min-height: auto;
+        padding: 8mm;
+      }
+      @page {
+        size: letter portrait;
+        margin: 6mm;
+      }
+    }
+
+    .plan-segment-label{font:11px Arial,sans-serif;fill:#173b4f;paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round}.plan-vertex-label{font:bold 14px Arial,sans-serif;fill:#b42332;paint-order:stroke;stroke:#fff;stroke-width:3px}.plan-north,.plan-scale-label,.plan-crs-label{font:12px Arial,sans-serif;fill:#173b4f}#plano-planimetrico svg{display:block;width:100%;height:auto;max-height:230px}
+  </style>
+</head>
+<body>
+
+  <div class="toolbar">
+    <button class="btn btn-print" onclick="window.print()">Imprimir / Guardar PDF</button>
+    <button class="btn btn-close" onclick="window.close()">Cerrar</button>
+  </div>
+
+  <div class="sheet" id="ficha-catastral">
+    <!-- ENCABEZADO -->
+    <div class="doc-header">
+      <div class="doc-title">
+        <h1>Ficha Catastral Simplificada</h1>
+        <p>Reporte técnico generado desde capas vectoriales del Geovisor</p>
+      </div>
+      <div class="doc-meta">
+        <div><span class="badge-cbml">CBML: {{CBML}}</span></div>
+        <div><strong>Fecha de consulta:</strong> {{FECHA_CONSULTA}}</div>
+        <div><strong>SRC:</strong> {{SISTEMA_COORDENADAS}}</div>
+      </div>
+    </div>
+
+    <!-- 1. IDENTIFICACIÓN Y LOCALIZACIÓN -->
+    <table>
+      <tr>
+        <th colspan="6" class="section-title">1. Identificación y Localización del Predio</th>
+      </tr>
+      <tr>
+        <td colspan="2">
+          <span class="field-label">Código CBML</span>
+          <div class="field-value">{{CBML}}</div>
+        </td>
+        <td colspan="2">
+          <span class="field-label">Cédula / Código Predial</span>
+          <div class="field-value">{{CODIGO_PREDIAL}}</div>
+        </td>
+        <td colspan="2">
+          <span class="field-label">Matrícula Inmobiliaria</span>
+          <div class="field-value">{{MATRICULA}}</div>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="3">
+          <span class="field-label">Dirección / Nomenclatura</span>
+          <div class="field-value">{{DIRECCION}}</div>
+        </td>
+        <td>
+          <span class="field-label">Comuna / Zona</span>
+          <div class="field-value">{{COMUNA}}</div>
+        </td>
+        <td>
+          <span class="field-label">Barrio / Sector</span>
+          <div class="field-value">{{BARRIO}}</div>
+        </td>
+        <td>
+          <span class="field-label">Manzana</span>
+          <div class="field-value">{{MANZANA}}</div>
+        </td>
+      </tr>
+      <tr class="sub-header text-center">
+        <td>Comuna (2)</td>
+        <td>Barrio (2)</td>
+        <td>Manzana (3)</td>
+        <td>Lote (4)</td>
+        <td colspan="2">Destino / Uso del Suelo</td>
+      </tr>
+      <tr class="text-center">
+        <td><div class="field-value">{{CBML_COMUNA}}</div></td>
+        <td><div class="field-value">{{CBML_BARRIO}}</div></td>
+        <td><div class="field-value">{{CBML_MANZANA}}</div></td>
+        <td><div class="field-value">{{CBML_LOTE}}</div></td>
+        <td colspan="2"><div class="field-value">{{DESTINO_ECONOMICO}}</div></td>
+      </tr>
+    </table>
+
+    <!-- 2. ÁREAS Y CARACTERÍSTICAS FÍSICAS -->
+    <table>
+      <tr>
+        <th colspan="4" class="section-title">2. Áreas y Características Físicas</th>
+      </tr>
+      <tr>
+        <td>
+          <span class="field-label">Área de Terreno (SHP)</span>
+          <div class="field-value">{{AREA_TERRENO}} m²</div>
+        </td>
+        <td>
+          <span class="field-label">Área Construida</span>
+          <div class="field-value">{{AREA_CONSTRUIDA}} m²</div>
+        </td>
+        <td>
+          <span class="field-label">Perímetro Calculado</span>
+          <div class="field-value">{{PERIMETRO}} m</div>
+        </td>
+        <td>
+          <span class="field-label">N° Pisos / Unidades</span>
+          <div class="field-value">{{NUM_PISOS}}</div>
+        </td>
+      </tr>
+    </table>
+
+    <!-- 3. PLANO PLANIMÉTRICO, LINDEROS Y COORDENADAS -->
+    <table>
+      <tr>
+        <th class="section-title">3. Croquis Planimétrico, Linderos y Coordenadas</th>
+      </tr>
+    </table>
+
+    <div class="planimetric-grid">
+      <!-- Lienzo del plano planimétrico -->
+      <div class="map-box">
+        <div class="map-canvas-container" id="plano-planimetrico">
+          <!-- Aquí el JS inyecta el SVG o Canvas del lote con vértices A, B, C..., cotas en metros, vecinos y flecha de Norte -->
+          {{SVG_PLANO_PLANIMETRICO}}
+        </div>
+        <div class="map-footer">
+          <span><strong>Escala aprox.:</strong> {{ESCALA_GRAFICA}}</span>
+          <span><strong>Unidades:</strong> Metros (m)</span>
+          <span><strong>Norte:</strong> ↑</span>
+        </div>
+      </div>
+
+      <!-- Tabla de linderos y coordenadas -->
+      <div class="coords-panel">
+        <table class="coords-table">
+          <thead>
+            <tr>
+              <th colspan="4" class="sub-header">Cuadro de Coordenadas y Linderos</th>
+            </tr>
+            <tr class="sub-header">
+              <th>Vértice</th>
+              <th>Este (X) / Lon</th>
+              <th>Norte (Y) / Lat</th>
+              <th>Tramo / Dist. (m)</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-vertices-body">
+            <!-- Filas generadas dinámicamente -->
+            <tr>
+              <td><strong>A</strong></td>
+              <td>{{X_A}}</td>
+              <td>{{Y_A}}</td>
+              <td>A–B: {{DIST_AB}} m</td>
+            </tr>
+            <tr>
+              <td><strong>B</strong></td>
+              <td>{{X_B}}</td>
+              <td>{{Y_B}}</td>
+              <td>B–C: {{DIST_BC}} m</td>
+            </tr>
+            <tr>
+              <td><strong>C</strong></td>
+              <td>{{X_C}}</td>
+              <td>{{Y_C}}</td>
+              <td>C–D: {{DIST_CD}} m</td>
+            </tr>
+            <tr>
+              <td><strong>D</strong></td>
+              <td>{{X_D}}</td>
+              <td>{{Y_D}}</td>
+              <td>D–A: {{DIST_DA}} m</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="legend-box">
+          <div class="field-label" style="margin-bottom: 4px;">Convenciones del Plano</div>
+          <div class="legend-item"><span class="sym-lot"></span> Lote consultado (CBML)</div>
+          <div class="legend-item"><span class="sym-const"></span> Construcción (si aplica)</div>
+          <div class="legend-item"><span class="sym-vertex"></span> Vértice lindero (A, B, C...)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. COLINDANTES Y ATRIBUTOS ADICIONALES DEL SHP -->
+    <table>
+      <tr>
+        <th colspan="2" class="section-title">4. Colindantes y Atributos Adicionales de la Capa</th>
+      </tr>
+      <tr>
+        <td style="width: 50%;">
+          <span class="field-label">Colindantes / Predios Vecinos (CBML)</span>
+          <div class="field-value">{{COLINDANTES}}</div>
+        </td>
+        <td style="width: 50%;">
+          <span class="field-label">Observaciones / Otros Atributos</span>
+          <div class="field-value">{{ATRIBUTOS_EXTRA}}</div>
+        </td>
+      </tr>
+    </table>
+
+    <!-- NOTA TÉCNICA NEUTRA -->
+    <div class="doc-disclaimer">
+      <strong>Nota técnica:</strong> Documento informativo de consulta espacial generado automáticamente a partir de la geometría y tabla de atributos cargadas en el geovisor. No constituye certificado catastral oficial ni documento con validez jurídica.
+    </div>
+  </div>
+
+</body>
+</html>

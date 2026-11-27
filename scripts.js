@@ -836,44 +836,76 @@
     return { area: Math.max(0, area), perimeter: perimeter, vertexCount: vertices.length, width: width };
   }
 
-  function generateCadastralSheet(feature) {
+  async function generateCadastralSheet(feature) {
     var dialog = document.getElementById('cadastral-sheet-dialog'), host = document.getElementById('cadastral-sheet-content');
-    if (!feature || !feature.geometry) return;
-    host.textContent = '';
-    var title = document.createElement('h1'); title.id = 'cadastral-sheet-title'; title.textContent = 'Ficha Catastral Simplificada'; host.appendChild(title);
-    var subtitle = document.createElement('p'); subtitle.className = 'cadastral-sheet-subtitle'; subtitle.textContent = 'Consulta por número predial o matrícula · Generada ' + new Date().toLocaleDateString('es-CO'); host.appendChild(subtitle);
-    var planFigure = document.createElement('figure'); planFigure.className = 'cadastral-plan-figure';
-    var properties = feature.properties || {}, get = function (key) { return propertyValue(properties, [key]); };
-    var metrics;
-    try { metrics = buildCadastralPlan(feature, planFigure); }
-    catch (error) { alert('No se pudo generar el plano: ' + error.message); return; }
-    var primary = [
-      ['Número predial', get('numero_pre')], ['Matrícula', get('matricula_')], ['CBML', get('cbml')], ['Código DIVIPOLA', get('cod_divipo')],
-      ['Dirección / nomenclatura', get('direccion') || get('nomenclatura')], ['Barrio / sector', neighborhoodForFeature(feature) || get('barrio') || get('sector')],
-      ['Municipio', get('municipio')], ['Zona', get('zona')], ['Condición', get('condicion_')], ['Destinación', get('destinacio')], ['Tipo de predio', get('tipo_predi')],
-      ['Área geométrica calculada (m²)', metrics.area.toFixed(2)], ['Área registrada (m²)', get('Shape_Area')], ['Perímetro calculado (m)', metrics.perimeter.toFixed(2)]
-    ];
-    cadastralSection('Identificación y características', primary, host);
-    var relatedBuildings = constructionFilterFeatures.filter(function (building) { return geometriesIntersect(building, feature); });
-    var builtArea = relatedBuildings.reduce(function (sum, building) { var val = Number(propertyValue(building.properties || {}, ['Shape_Area', 'area_const'])); return sum + (Number.isFinite(val) && val > 0 ? val : 0); }, 0);
-    cadastralSection('Construcciones por intersección espacial', [['Construcciones que intersectan', constructionFilterFeatures.length ? relatedBuildings.length : 'N/A · capa no cargada'], ['Suma de áreas registradas en la capa (m²)', constructionFilterFeatures.length ? (builtArea ? builtArea.toFixed(2) : 'N/A') : 'N/A · capa no cargada']], host);
-    var neighborFields = Object.keys(properties).filter(function (key) { return /linder|colind|vecin|frente|norte|sur|oriente|occidente/i.test(key); });
-    cadastralSection('Colindantes y linderos', neighborFields.length ? neighborFields.map(function (key) { return [key, properties[key]]; }) : [['Colindantes en atributos', 'No disponibles en la capa. Consulte longitudes y vértices del lindero en el plano.']], host);
-    var riskFields = Object.keys(properties).filter(function (key) { return /riesgo|amenaz|categoria/i.test(key); });
-    cadastralSection('Riesgo y amenaza registrados', riskFields.length ? riskFields.map(function (key) { return [key, properties[key]]; }) : [['Clasificación', 'N/A · no existe en los atributos del predio']], host);
-    var valueFields = Object.keys(properties).filter(function (key) { return /avalu|valor|precio/i.test(key); });
-    cadastralSection('Avalúos registrados', valueFields.length ? valueFields.map(function (key) { return [key, properties[key]]; }) : [['Avalúo', 'N/A · no existe en los atributos del predio']], host);
-    var planSection = document.createElement('section'); planSection.className = 'cadastral-sheet-section cadastral-plan-section';
-    var planTitle = document.createElement('h2'); planTitle.textContent = 'Plano planimétrico'; planSection.appendChild(planTitle);
-    planSection.appendChild(planFigure);
-    var scaleDenominator = Math.max(1, Math.round((metrics.width * 1000 / 190) / 100) * 100);
-    var caption = document.createElement('figcaption'); caption.textContent = metrics.vertexCount + ' vértices · Perímetro ' + metrics.perimeter.toFixed(2) + ' m · Área planimétrica ' + metrics.area.toFixed(2) + ' m² · Escala de impresión aproximada 1:' + scaleDenominator.toLocaleString('es-CO') + '. Longitudes y coordenadas calculadas desde la geometría transformada a EPSG:9377.'; planSection.appendChild(caption);
-    host.appendChild(planSection);
-    var technical = document.createElement('p'); technical.className = 'cadastral-sheet-note'; technical.textContent = 'SRC de la capa: MAGNA-SIRGAS 2018 / Origen-Nacional (EPSG:9377). Las longitudes y áreas se calculan a partir de la geometría disponible. Los datos no presentes en la capa se indican como N/A; las intersecciones espaciales no certifican linderos jurídicos.'; host.appendChild(technical);
-    var known = new Set(['fid_', 'cod_divipo', 'departamen', 'municipio', 'numero_pre', 'matricula_', 'zona', 'condicion_', 'destinacio', 'tipo_predi', 'tipo_derec', 'valor_come', 'avaluo_cat', 'valor_co_1', 'avaluo_c_1', 'valor_co_2', 'avaluo_c_2', 'Shape_Leng', 'Shape_Area', 'riesgo', 'categoria', 'cbml', 'direccion', 'nomenclatura', 'barrio', 'sector']);
-    var otherFields = Object.keys(properties).filter(function (key) { return !known.has(key); });
-    if (otherFields.length) cadastralSection('Otros atributos disponibles en la capa', otherFields.map(function (key) { return [key, properties[key]]; }), host);
+    var printButton = document.getElementById('cadastral-sheet-print');
+    if (!feature || !feature.geometry) { alert('Selecciona un predio con geometría para generar la ficha.'); return; }
+    host.textContent = 'Generando ficha catastral…'; printButton.disabled = true;
     if (!dialog.open) dialog.showModal();
+    try {
+      var response = await fetch(new URL('plantilla_ficha_catastral.html', document.baseURI), { cache: 'no-store' });
+      if (!response.ok) throw new Error('No se pudo cargar plantilla_ficha_catastral.html (HTTP ' + response.status + ').');
+      var templateMarkup = await response.text();
+      var templateDocument = new DOMParser().parseFromString(templateMarkup, 'text/html');
+      var properties = feature.properties || {};
+      var get = function (aliases) { return propertyValue(properties, Array.isArray(aliases) ? aliases : [aliases]); };
+      var value = function (entry) {
+        if (entry == null || String(entry).trim() === '') return 'N/A';
+        if (typeof entry === 'object') { try { return JSON.stringify(entry); } catch (error) { return String(entry); } }
+        return String(entry);
+      };
+      var planArtifacts = document.createElement('div');
+      var metrics = buildCadastralPlan(feature, planArtifacts);
+      var planSvg = planArtifacts.querySelector('svg');
+      var generatedRows = planArtifacts.querySelectorAll('.cadastral-coordinate-table tbody tr');
+      if (!planSvg) throw new Error('No se pudo dibujar el plano planimétrico.');
+      var planContainer = templateDocument.getElementById('plano-planimetrico');
+      planContainer.replaceChildren(planSvg.cloneNode(true));
+      var coordinateBody = templateDocument.getElementById('tabla-vertices-body');
+      coordinateBody.replaceChildren();
+      generatedRows.forEach(function (sourceRow) { coordinateBody.appendChild(sourceRow.cloneNode(true)); });
+      if (!coordinateBody.children.length) {
+        var emptyRow = templateDocument.createElement('tr'), emptyCell = templateDocument.createElement('td');
+        emptyCell.colSpan = 4; emptyCell.textContent = 'Coordenadas no disponibles.'; emptyRow.appendChild(emptyCell); coordinateBody.appendChild(emptyRow);
+      }
+      var relatedBuildings = constructionFilterFeatures.filter(function (building) { return geometriesIntersect(building, feature); });
+      var buildingAreas = relatedBuildings.map(function (building) { return Number(propertyValue(building.properties || {}, ['Shape_Area', 'area_const'])) || 0; }).filter(function (area) { return area > 0; });
+      var floors = Array.from(new Set(relatedBuildings.map(function (building) { return propertyValue(building.properties || {}, ['numero_pis', 'num_pisos', 'pisos']); }).filter(function (floor) { return floor != null && String(floor).trim() !== ''; })));
+      var cbml = value(get('cbml'));
+      var cbmlDigits = cbml === 'N/A' ? '' : cbml.replace(/\D/g, '');
+      var known = new Set(['fid_', 'cod_divipo', 'departamen', 'municipio', 'numero_pre', 'matricula_', 'zona', 'condicion_', 'destinacio', 'tipo_predi', 'tipo_derec', 'valor_come', 'avaluo_cat', 'valor_co_1', 'avaluo_c_1', 'valor_co_2', 'avaluo_c_2', 'shape_leng', 'shape_area', 'riesgo', 'categoria', 'cbml', 'direccion', 'nomenclatura', 'barrio', 'sector']);
+      var extras = Object.keys(properties).filter(function (key) { return !known.has(normalizedText(key)); }).map(function (key) { return key + ': ' + value(properties[key]); });
+      var neighbors = Object.keys(properties).filter(function (key) { return /linder|colind|vecin|frente|norte|sur|oriente|occidente/i.test(key); }).map(function (key) { return key + ': ' + value(properties[key]); });
+      var scaleDenominator = Math.max(1, Math.round((metrics.width * 1000 / 190) / 100) * 100);
+      var tokenValues = {
+        CBML: cbml, CODIGO_PREDIAL: value(get(['numero_pre', 'codigo_predial', 'cedula_catastral'])), MATRICULA: value(get('matricula_')),
+        DIRECCION: value(get(['direccion', 'nomenclatura', 'dir_predio', 'direccion_', 'dir_pred', 'direccion_predio'])),
+        COMUNA: value(get(['comuna', 'comuna_', 'zona'])), BARRIO: value(neighborhoodForFeature(feature) || get(['barrio', 'sector'])),
+        MANZANA: value(get(['manzana', 'manzana_', 'manzana_cat']) || (cbmlDigits.length >= 7 ? cbmlDigits.slice(4, 7) : '')),
+        CBML_COMUNA: cbmlDigits.length >= 2 ? cbmlDigits.slice(0, 2) : 'N/A', CBML_BARRIO: cbmlDigits.length >= 4 ? cbmlDigits.slice(2, 4) : 'N/A',
+        CBML_MANZANA: cbmlDigits.length >= 7 ? cbmlDigits.slice(4, 7) : 'N/A', CBML_LOTE: cbmlDigits.length >= 11 ? cbmlDigits.slice(7, 11) : 'N/A',
+        DESTINO_ECONOMICO: value(get(['destinacio', 'destino', 'uso_suelo', 'destino_economico'])),
+        AREA_TERRENO: value(get(['Shape_Area', 'area_terreno']) || metrics.area.toFixed(2)),
+        AREA_CONSTRUIDA: buildingAreas.length ? buildingAreas.reduce(function (sum, area) { return sum + area; }, 0).toFixed(2) : 'N/A',
+        PERIMETRO: metrics.perimeter.toFixed(2), NUM_PISOS: floors.length ? floors.join(', ') : 'N/A',
+        FECHA_CONSULTA: new Date().toLocaleDateString('es-CO'), SISTEMA_COORDENADAS: 'MAGNA-SIRGAS 2018 / Origen-Nacional (EPSG:9377)',
+        ESCALA_GRAFICA: '1:' + scaleDenominator.toLocaleString('es-CO'), COLINDANTES: neighbors.length ? neighbors.join(' · ') : 'N/A en los atributos disponibles; consulte los linderos y longitudes del plano.',
+        ATRIBUTOS_EXTRA: extras.length ? extras.join(' · ') : 'N/A · no hay otros atributos disponibles en la capa.'
+      };
+      var escapeHtml = function (text) { return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); };
+      var oldToolbar = templateDocument.querySelector('.toolbar');
+      if (oldToolbar) oldToolbar.remove();
+      renderedMarkup = '<!doctype html>' + templateDocument.documentElement.outerHTML.replace(/\{\{([A-Z0-9_]+)\}\}/g, function (placeholder, key) {
+        return key === 'SVG_PLANO_PLANIMETRICO' ? planSvg.outerHTML : escapeHtml(value(tokenValues[key]));
+      });
+      var iframe = document.createElement('iframe');
+      iframe.className = 'cadastral-template-frame'; iframe.title = 'Ficha catastral simplificada';
+      iframe.addEventListener('load', function () { printButton.disabled = false; }, { once: true });
+      host.replaceChildren(iframe); iframe.srcdoc = renderedMarkup;
+    } catch (error) {
+      host.textContent = 'No se pudo generar la ficha: ' + error.message;
+      printButton.disabled = false;
+    }
   }
 
   function showFeatureInspector(layer) {
@@ -904,7 +936,7 @@
   }
   function selectFeatureLayer(layer) {
     if (selectedFeatureLayer && selectedFeatureLayer !== layer && selectedFeatureLayer._originalFeatureStyle) {
-      selectedFeatureLayer.setStyle(selectedFeatureLayer._originalFeatureStyle);
+      selectedFeatureLayer.setStyle(selectedFeatureLayer._resolveFeatureStyle ? selectedFeatureLayer._resolveFeatureStyle() : selectedFeatureLayer._originalFeatureStyle);
     }
     selectedFeatureLayer = layer;
     attributeFocusedFeature = layer && layer.feature || null;
@@ -916,7 +948,7 @@
   }
 
   function clearFeatureSelection() {
-    if (selectedFeatureLayer && selectedFeatureLayer._originalFeatureStyle && selectedFeatureLayer.setStyle) selectedFeatureLayer.setStyle(selectedFeatureLayer._originalFeatureStyle);
+    if (selectedFeatureLayer && selectedFeatureLayer._originalFeatureStyle && selectedFeatureLayer.setStyle) selectedFeatureLayer.setStyle(selectedFeatureLayer._resolveFeatureStyle ? selectedFeatureLayer._resolveFeatureStyle() : selectedFeatureLayer._originalFeatureStyle);
     selectedFeatureLayer = null; selectedInspectorLayer = null; attributeFocusedFeature = null;
     var inspector = document.getElementById('feature-inspector');
     if (inspector) inspector.hidden = true;
@@ -1933,7 +1965,7 @@
           }
           featureLayer._originalFeatureStyle = Object.assign({}, featureLayer.options);
           featureLayer._resolveFeatureStyle = function () { return layer.options.style ? layer.options.style(featureLayer.feature) : Object.assign({}, featureLayer._originalFeatureStyle); };
-          if (!isParcelLayer && !isConstructionLayer) featureLayer.on('click', function (event) {
+          if (!isCadastralLayer) featureLayer.on('click', function (event) {
             if (activeAction || activeEdit) { if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent); return; }
             if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent);
             if (!selectionToolActive) {
@@ -1946,6 +1978,14 @@
               if (featureLayer.closePopup) featureLayer.closePopup();
               return;
             }
+          });
+          else featureLayer.on('click', function (event) {
+            if (activeAction || activeEdit) { if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent); return; }
+            if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent);
+            if (!selectionToolActive) return;
+            selectFeatureLayer(featureLayer);
+            var bounds = getLayerBounds(featureLayer);
+            if (bounds) map.fitBounds(bounds, { padding: [36, 36], maxZoom: 17 });
           });
           feature._leafletLayer = featureLayer;
           if (isBoundary) {
@@ -1981,11 +2021,6 @@
         });
         row.appendChild(symbologyButton);
       }
-      if (isParcelLayer || isConstructionLayer) layer.on('click', function (event) {
-        if (activeAction || activeEdit) { if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent); return; }
-        if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent);
-        if (selectionToolActive && event.layer) selectFeatureLayer(event.layer);
-      });
       if (isParcelLayer || isConstructionLayer) {
         // Make cadastral layers visible at neighborhood scale instead of only at street level.
         var minZoom = 13;
@@ -2790,10 +2825,11 @@
   });
   document.getElementById('cadastral-sheet-close').addEventListener('click', function () { document.getElementById('cadastral-sheet-dialog').close(); });
   document.getElementById('cadastral-sheet-print').addEventListener('click', function () {
-    document.body.classList.add('printing-cadastral-sheet');
-    window.print();
+    var frame = document.querySelector('#cadastral-sheet-content iframe');
+    if (!frame || !frame.contentWindow) { alert('La ficha todavía se está generando.'); return; }
+    frame.contentWindow.focus();
+    frame.contentWindow.print();
   });
-  window.addEventListener('afterprint', function () { document.body.classList.remove('printing-cadastral-sheet'); });
   document.getElementById('inspector-share').addEventListener('click', async function () {
     var feature = selectedInspectorLayer && selectedInspectorLayer.feature;
     if (!feature) { document.getElementById('inspector-share-status').textContent = 'Selecciona un predio o una construcción primero.'; return; }
