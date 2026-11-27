@@ -19,11 +19,11 @@ const CONFIG = Object.freeze({
   parcelsProjectionUrl: "data/Predios_Barrios_Estudio/Predios_Estudio.prj",
   parcelsAttributesUrl: "data/Predios_Barrios_Estudio/Predios_Estudio.dbf",
   parcelsEncodingUrl: "data/Predios_Barrios_Estudio/Predios_Estudio.cpg",
-  riskUrl: "data/Riesgo_Mov_Masa/Riesgo_Mov_Masa.shp",
-  riskIndexUrl: "data/Riesgo_Mov_Masa/Riesgo_Mov_Masa.shx",
-  riskAttributesUrl: "data/Riesgo_Mov_Masa/Riesgo_Mov_Masa.dbf",
-  riskEncodingUrl: "data/Riesgo_Mov_Masa/Riesgo_Mov_Masa.cpg",
-  riskProjectionUrl: "data/Riesgo_Mov_Masa/Riesgo_Mov_Masa.prj",
+  riskUrl: "data/RIESGO_MOV_MASA/RIESGO_MOV_MASA.shp",
+  riskIndexUrl: "data/RIESGO_MOV_MASA/RIESGO_MOV_MASA.shx",
+  riskAttributesUrl: "data/RIESGO_MOV_MASA/RIESGO_MOV_MASA.dbf",
+  riskEncodingUrl: "data/RIESGO_MOV_MASA/RIESGO_MOV_MASA.cpg",
+  riskProjectionUrl: "data/RIESGO_MOV_MASA/RIESGO_MOV_MASA.prj",
   threatUrl: "data/Amenaza_Mov_Masa/Amenaza_Mov_Masa.shp",
   threatIndexUrl: "data/Amenaza_Mov_Masa/Amenaza_Mov_Masa.shx",
   threatAttributesUrl: "data/Amenaza_Mov_Masa/Amenaza_Mov_Masa.dbf",
@@ -1017,7 +1017,7 @@ function setupFeatureSelection(scene, camera, renderer, controls, layers, surfac
   highlight.name = "selected_feature_highlight";
   scene.add(highlight);
   let active = false, pointerStart = null;
-  const layerLabels = { buildings: "Construccion", volumes: "Construccion 3D (altura estimada)", parcels: "Predio", risk: "Zona de riesgo", threat: "Zona de amenaza", buffer: "Barrio de Manrique" };
+  const layerLabels = { buildings: "Construcción", volumes: "Construcción 3D (altura estimada)", parcels: "Predio", risk: "Zona de riesgo", threat: "Zona de amenaza", buffer: "Área de estudio" };
   const fieldLabels = {
     fid_: "FID", cod_divipo: "Codigo DIVIPOLA", numero_pre: "Numero predial", matricula_: "Matricula", zona: "Zona", condicion_: "Condicion", destinacio: "Destinacion", tipo_predi: "Tipo de predio", shape_area: "Area registrada (m2)", cat_amenza: "Categoria de amenaza", cat_riesgo: "Categoria de riesgo",
     codigo: "Codigo", nombre: "Nombre", descripcio: "Descripcion", tipo_amena: "Tipo de amenaza", categoria_: "Categoria", subcategor: "Subcategoria", fecha_adop: "Fecha de adopcion", fecha_actu: "Fecha de actualizacion", objectid: "ObjectID", categoria: "Categoria", grado_amen: "Grado de amenaza",
@@ -1876,12 +1876,12 @@ async function main() {
   enableLayerToggle("layer-risk", riskLayer);
   enableLayerToggle("layer-threat", threatLayer);
   const selectionLayers = [
-    { key: "buildings", layer: buildingLayer, source: "Contrucciones_Manrique", features: buildingFeatures, enabled: () => document.getElementById("layer-buildings").checked },
-    { key: "volumes", layer: estimatedBuildingLayer, source: "Contrucciones_Manrique", features: buildingFeatures, enabled: () => document.getElementById("layer-building-volumes").checked },
-    { key: "parcels", layer: parcelLayer, source: "Predios", features: parcelFeatures, enabled: () => document.getElementById("layer-parcels").checked },
+    { key: "buildings", layer: buildingLayer, source: "Construcciones_Barrios_Estudio", features: buildingFeatures, enabled: () => document.getElementById("layer-buildings").checked },
+    { key: "volumes", layer: estimatedBuildingLayer, source: "Construcciones_Barrios_Estudio", features: buildingFeatures, enabled: () => document.getElementById("layer-building-volumes").checked },
+    { key: "parcels", layer: parcelLayer, source: "Predios_Barrios_Estudio", features: parcelFeatures, enabled: () => document.getElementById("layer-parcels").checked },
     { key: "risk", layer: riskLayer, source: "RIESGO_MOV_MASA", features: new Map(riskSource.features.map(feature => [feature.id, feature])), enabled: () => document.getElementById("layer-risk").checked },
     { key: "threat", layer: threatLayer, source: "Amenaza_Mov_Masa", features: new Map(threatSource.features.map(feature => [feature.id, feature])), enabled: () => document.getElementById("layer-threat").checked },
-    { key: "buffer", layer: bufferLayer, source: "Barrios", features: new Map(bufferSource.features.map(feature => [feature.id, feature])), enabled: () => document.getElementById("layer-buffer").checked }
+    { key: "buffer", layer: bufferLayer, source: "BARRIOS_INFLUENCIA", features: new Map(bufferSource.features.map(feature => [feature.id, feature])), enabled: () => document.getElementById("layer-buffer").checked }
   ];
   setupFeatureSelection(scene, camera, renderer, controls, selectionLayers, { sampleArgs: [displaySurface.values, displaySurface.mask, width, height, extent], originX, originNorth, baseElevation });
   if (!renderedTriangles) throw new Error("No se generaron triángulos válidos; revise la máscara NoData del DEM.");

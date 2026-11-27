@@ -1,11 +1,13 @@
-# GeoVisor Manrique · borrador local
+# GeoVisor Manrique
 
-Esta copia está destinada a la corrección del proyecto de investigación. Los cambios se mantienen locales y la publicación automática está desactivada.
+Visor 2D y escenario 3D para el área de estudio de cuatro barrios de la Comuna 3, Manrique, Medellín.
 
-## Abrir el visor
+## Abrir localmente
 
-Abre `index.html` desde un servidor estático local, por ejemplo con la extensión Live Server de Visual Studio Code. No lo abras como `file://`: el navegador necesita HTTP local para leer los shapefiles y GeoTIFF.
+Sirve la carpeta con un servidor HTTP local, por ejemplo Live Server de Visual Studio Code, y abre index.html. El navegador necesita HTTP para leer los shapefiles y los GeoTIFF. vista-3d.html abre el escenario tridimensional.
 
-La vista 2D usa las capas actualizadas de Manrique. Las capas grandes de predios y construcciones se cargan cuando se activan desde el panel. La vista 3D usa el DEM de Manrique a 5 m; la ortofoto que trae esta copia cubre únicamente el sector UVA.
+## Capas del área de estudio
 
-No uses las tareas ni el script de publicación para este borrador.
+Las rutas vigentes están dentro de data: límite de los cuatro barrios, manzanas, predios, construcciones, amenaza, riesgo, curvas de nivel, DEM de 5 m, pendiente y teselas GeoTIFF de ortofoto. Los archivos DBF y CPG usan las mayúsculas exactas registradas en Git para funcionar también en GitHub Pages (Linux).
+
+Las capas voluminosas de predios y construcciones se cargan al activarlas. El escenario 3D usa el DEM de 5 m y las teselas locales de ortofoto.

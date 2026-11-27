@@ -1,3 +1,0 @@
-Copia local anterior a la sustitución por origin/main.
-Commit local registrado: da13ccc677f7d6cfd0f219f6704095b29d4dc608
-Creado: 2026-11-26

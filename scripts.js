@@ -38,8 +38,6 @@
   map.createPane('diagnosticPane');
   map.getPane('diagnosticPane').style.zIndex = 615;
   map.getPane('diagnosticPane').style.pointerEvents = 'none';
-  map.createPane('landmarkPane');
-  map.getPane('landmarkPane').style.zIndex = 640;
   map.createPane('printGridPane');
   map.getPane('printGridPane').style.zIndex = 625;
   map.createPane('printGridLabelPane');
@@ -571,40 +569,6 @@
   addLayerControl('Ortofoto Medellín 2025 (carga optimizada)', ortofotoMedellin, '#2f855a', true, true);
   baseLayers.forEach(function (baseLayer) { if (baseLayer !== ortofotoMedellin && map.hasLayer(baseLayer)) map.removeLayer(baseLayer); });
   ortofotoMedellin.addTo(map);
-
-  var uvaIcon = L.divIcon({
-    className: 'uva-div-icon',
-    html: '<span class="uva-marker-shell" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M4 17.5h16M6.5 17.5V9l5.5-4 5.5 4v8.5M9.5 17.5v-4h5v4M8.5 9.5h.01M12 8h.01M15.5 9.5h.01" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>',
-    iconSize: [40, 44],
-    iconAnchor: [20, 40],
-    tooltipAnchor: [17, -28],
-    popupAnchor: [0, -38]
-  });
-  var uvaMarker = L.marker([6.27452, -75.54542], {
-    pane: 'landmarkPane',
-    icon: uvaIcon,
-    title: 'UVA La Armonía',
-    alt: 'UVA La Armonía, Santa Inés'
-  }).addTo(map);
-  uvaMarker.bindTooltip('UVA La Armonía', {
-    permanent: true,
-    direction: 'right',
-    offset: [10, -15],
-    className: 'uva-label',
-    opacity: 1
-  });
-  var uvaPopup = document.createElement('article');
-  uvaPopup.className = 'uva-popup';
-  var uvaPopupPhoto = document.createElement('img');
-  uvaPopupPhoto.className = 'uva-popup-photo';
-  uvaPopupPhoto.src = 'Images/Uva_Armonía.jpg';
-  uvaPopupPhoto.alt = 'Vista de la UVA La Armonía, su piscina y el barrio de ladera';
-  var uvaPopupTitle = document.createElement('strong');
-  uvaPopupTitle.textContent = 'UVA La Armonía';
-  var uvaPopupAddress = document.createElement('span');
-  uvaPopupAddress.textContent = 'Carrera 36 # 84-98 · Santa Inés, Manrique';
-  uvaPopup.append(uvaPopupPhoto, uvaPopupTitle, uvaPopupAddress);
-  uvaMarker.bindPopup(uvaPopup, { className: 'uva-popup-container', maxWidth: 320 });
 
   var attributeFeatures = [];
   var attributeSourceFeatures = [];
@@ -1515,7 +1479,7 @@
     overlays[name] = group;
     group._sourcePath = path + '.shp';
     group._sourceCrs = 'EPSG:9377'; group._displayCrs = 'EPSG:4326 · shpjs transforma las geometrías al cargarlas';
-    var styleEditable = !/Predios_Influencia|Predios_Estudio|Construcciones_Area_Estudio|Construcciones_Barrios_Estudio|Comuna_3[\\/]Predios|Contrucciones_Manrique/i.test(path);
+    var styleEditable = !/Predios_Barrios_Estudio|Construcciones_Barrios_Estudio/i.test(path);
     var initiallyVisible = /BARRIOS_INFLUENCIA/i.test(path);
     addLayerControl(name, group, color, initiallyVisible, false, styleEditable);
     var row = Array.from(layerList.querySelectorAll('.layer-item')).find(function (item) {
@@ -1531,7 +1495,7 @@
       tableButton.addEventListener('click', function (event) { event.preventDefault(); event.stopPropagation(); if (group.featureData) showAttributeTable(name, group.featureData); });
       row.appendChild(tableButton);
     }
-    var deferLargeLayer = /visor_optimizado[\\/](?:predios[\\/]Predios_Manrique|construcciones[\\/]Construcciones_Manrique)|Comuna_3[\\/]Predios|Contrucciones_Manrique/i.test(path);
+    var deferLargeLayer = /Predios_Barrios_Estudio[\\/]Predios_Estudio|Construcciones_Barrios_Estudio[\\/]Construcciones/i.test(path);
     if (row) row.querySelector('.layer-state').textContent = deferLargeLayer ? 'LISTA' : 'CARGANDO';
     var source = new Promise(function (resolve, reject) {
       group._startLoad = function () {
@@ -1556,15 +1520,14 @@
         if (item && item.type === 'Feature') all.push(item);
         return all;
       }, []);
-      var isBoundary = path.indexOf('shp_barrios_y_veredas_mr') !== -1 || path.indexOf('Barrios_Manrique') !== -1 || path.indexOf('BARRIOS_INFLUENCIA') !== -1;
-      var isStudyBuffer = /Bff_Uva/i.test(path);
-      var isParcelLayer = /Predios_Influencia|Predios_Estudio|Comuna_3[\\/]Predios|visor_optimizado[\\/]predios/i.test(path);
-      var isConstructionLayer = /Construcciones_Area_Estudio|Construcciones_Barrios_Estudio[\\/]Construcciones|Contrucciones_Manrique|visor_optimizado[\\/]construcciones/i.test(path);
-      var riskKind = path.indexOf('Amenaza_Mov_Masa') !== -1 ? 'threat' : (/RIESGO_MOV_MASA|Riesgo_Mov_Masa|Construcciones_Area_Estudio|Construcciones_Barrios_Estudio|Predios_Influencia|Predios_Estudio|visor_optimizado[\\/]construcciones/i.test(path) ? 'landslide' : null);
+      var isBoundary = path.indexOf('BARRIOS_INFLUENCIA') !== -1;
+      var isParcelLayer = /Predios_Barrios_Estudio[\\/]Predios_Estudio/i.test(path);
+      var isConstructionLayer = /Construcciones_Barrios_Estudio[\\/]Construcciones/i.test(path);
+      var riskKind = path.indexOf('Amenaza_Mov_Masa') !== -1 ? 'threat' : (/RIESGO_MOV_MASA|Construcciones_Barrios_Estudio/i.test(path) ? 'landslide' : null);
       var isRiskZoneLayer = riskKind && !isParcelLayer && !isConstructionLayer;
       var featurePane = isRiskZoneLayer ? 'riskPane' : (isParcelLayer ? 'parcelPane' : (isConstructionLayer ? 'constructionPane' : undefined));
       var renderFeatures = features;
-      if (path.indexOf('Barrios_Manrique') !== -1 || path.indexOf('BARRIOS_INFLUENCIA') !== -1) {
+      if (isBoundary) {
         neighborhoodFeatures = features;
         if (neighborhoodFilter) {
           var selectedNeighborhood = neighborhoodFilter.value;
@@ -1591,12 +1554,12 @@
           var featureColor = riskKind ? appearance.color : color;
           return {
             pane: featurePane,
-            color: isBoundary ? '#ff35d3' : (isStudyBuffer ? '#b87900' : featureColor),
-            weight: isStudyBuffer ? 3 : (isBoundary ? 2.5 : (isRiskZoneLayer || isConstructionLayer ? appearance.weight : (isParcelLayer ? 1.15 : 1.5))),
+            color: isBoundary ? '#ff35d3' : featureColor,
+            weight: isBoundary ? 3.5 : (isRiskZoneLayer || isConstructionLayer ? appearance.weight : (isParcelLayer ? 1.15 : 1.5)),
             opacity: 0.95,
             fillColor: featureColor,
-            fillOpacity: isStudyBuffer ? 0.08 : (isRiskZoneLayer ? appearance.fillOpacity : (isParcelLayer ? 0.08 : (isConstructionLayer ? Math.min(0.22, appearance.fillOpacity + 0.06) : 0))),
-            dashArray: isStudyBuffer ? '7 4' : appearance.dashArray,
+            fillOpacity: isRiskZoneLayer ? appearance.fillOpacity : (isParcelLayer ? 0.08 : (isConstructionLayer ? Math.min(0.22, appearance.fillOpacity + 0.06) : 0)),
+            dashArray: appearance.dashArray,
             className: isBoundary ? 'boundary-feature' : undefined
           };
         },
@@ -1683,7 +1646,7 @@
       var opacityInput = row && row._opacityInput;
       if (opacityInput) opacityInput.dispatchEvent(new Event('input'));
       if (isParcelLayer || isConstructionLayer) updateScaleLimitedLayers();
-      if (path.indexOf('Barrios_Manrique') !== -1 || path.indexOf('BARRIOS_INFLUENCIA') !== -1) applyDataFilters();
+      if (path.indexOf('BARRIOS_INFLUENCIA') !== -1) applyDataFilters();
       if (isRiskZoneLayer && riskKind === 'landslide') applyDataFilters();
       if (isParcelLayer || isConstructionLayer) applyDataFilters();
       if (isParcelLayer || isConstructionLayer) tryResolveDirectEntityLink();
@@ -1715,7 +1678,7 @@
   loadShapefileOverlay('data/Construcciones_Barrios_Estudio/Construcciones', 'Construcciones de los barrios de estudio', '#e76f51');
   loadShapefileOverlay('data/Predios_Barrios_Estudio/Predios_Estudio', 'Predios de los barrios de estudio', '#9b5de5');
   loadShapefileOverlay('data/Manzanas_Barrios_Estudio/Manzanas', 'Manzanas de los barrios de estudio', '#00b4d8');
-  loadShapefileOverlay('data/Riesgo_Mov_Masa/Riesgo_Mov_Masa', 'Riesgo por movimiento en masa', '#4361ee');
+  loadShapefileOverlay('data/RIESGO_MOV_MASA/RIESGO_MOV_MASA', 'Riesgo por movimiento en masa', '#4361ee');
   var localLayerColorIndex = 0;
   var localLayerColors = ['#0f7180', '#c2410c', '#7c3aed', '#2563eb', '#b42332', '#15803d'];
   if (window.proj4) {
@@ -2382,17 +2345,6 @@
     riskLegendToggle.title = riskLegendUserHidden ? 'Mostrar la simbología de capas de riesgo' : 'Ocultar la simbología de capas de riesgo';
     riskLegendToggle.setAttribute('aria-label', riskLegendUserHidden ? 'Mostrar simbología' : 'Ocultar simbología');
     riskLegendToggle.querySelector('span').textContent = riskLegendUserHidden ? 'MOSTRAR SIMBOLOGÍA' : 'OCULTAR SIMBOLOGÍA';
-  });
-  var uvaMarkerToggle = document.getElementById('toggle-uva-marker');
-  var uvaMarkerHidden = false;
-  uvaMarkerToggle.addEventListener('click', function () {
-    uvaMarkerHidden = !uvaMarkerHidden;
-    if (uvaMarkerHidden) map.removeLayer(uvaMarker);
-    else uvaMarker.addTo(map);
-    uvaMarkerToggle.setAttribute('aria-expanded', String(!uvaMarkerHidden));
-    uvaMarkerToggle.title = uvaMarkerHidden ? 'Mostrar marcador UVA La Armonía' : 'Ocultar marcador UVA La Armonía';
-    uvaMarkerToggle.setAttribute('aria-label', uvaMarkerToggle.title);
-    uvaMarkerToggle.querySelector('span').textContent = uvaMarkerHidden ? 'MOSTRAR UVA' : 'OCULTAR UVA';
   });
   function updatePrintComposition() {
     var rail = document.querySelector('.print-rail');
