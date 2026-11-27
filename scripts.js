@@ -895,7 +895,7 @@
       var escapeHtml = function (text) { return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); };
       var oldToolbar = templateDocument.querySelector('.toolbar');
       if (oldToolbar) oldToolbar.remove();
-      renderedMarkup = '<!doctype html>' + templateDocument.documentElement.outerHTML.replace(/\{\{([A-Z0-9_]+)\}\}/g, function (placeholder, key) {
+      var renderedMarkup = '<!doctype html>' + templateDocument.documentElement.outerHTML.replace(/\{\{([A-Z0-9_]+)\}\}/g, function (placeholder, key) {
         return key === 'SVG_PLANO_PLANIMETRICO' ? planSvg.outerHTML : escapeHtml(value(tokenValues[key]));
       });
       var iframe = document.createElement('iframe');
