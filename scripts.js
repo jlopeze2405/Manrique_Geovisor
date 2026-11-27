@@ -1,6 +1,22 @@
 (function () {
   'use strict';
 
+  var onboardingDialog = document.getElementById('onboarding-dialog');
+  if (onboardingDialog && typeof onboardingDialog.showModal === 'function') {
+    var onboardingDismissed = false;
+    try { onboardingDismissed = window.sessionStorage.getItem('geomanrique-guide-seen') === '1'; } catch (error) { /* El instructivo sigue disponible sin almacenamiento. */ }
+    function dismissOnboarding() {
+      if (onboardingDialog.open) onboardingDialog.close();
+      try { window.sessionStorage.setItem('geomanrique-guide-seen', '1'); } catch (error) { /* El cierre solo dura esta carga. */ }
+    }
+    document.getElementById('onboarding-close').addEventListener('click', dismissOnboarding);
+    document.getElementById('onboarding-start').addEventListener('click', dismissOnboarding);
+    onboardingDialog.addEventListener('cancel', function () {
+      try { window.sessionStorage.setItem('geomanrique-guide-seen', '1'); } catch (error) { /* El cierre solo dura esta carga. */ }
+    });
+    if (!onboardingDismissed) window.requestAnimationFrame(function () { onboardingDialog.showModal(); });
+  }
+
   var initialCenter;
   var initialZoom = 12;
   function webMercatorToLatLng(x, y) {
