@@ -30,7 +30,7 @@
           <div class="multi-filter" data-filter="property-type"><span class="filter-label">Tipo de predio</span><details><summary id="property-type-summary">Todos</summary><div class="filter-options" id="property-type-options"></div></details></div>
           <div class="multi-filter" data-filter="land-use"><span class="filter-label">Destinación predial</span><details><summary id="land-use-summary">Todas</summary><div class="filter-options" id="land-use-options"></div></details></div>
           <div class="multi-filter" data-filter="floors"><span class="filter-label">Número de pisos</span><details><summary id="floors-summary">Todos</summary><div class="filter-options compact" id="floors-options"></div></details></div>
-          <label class="search-filter">Buscar identificador<input id="global-search" type="search" placeholder="Número predial, CBML o ID de construcción"></label>
+          <label class="search-filter">Buscar número catastral o matrícula<input id="global-search" type="search" placeholder="Número predial o matrícula"></label>
         </div>
         <div class="filter-chips" id="active-filters" aria-live="polite"></div>
       </section>
@@ -55,7 +55,7 @@
       </section>
 
       <section class="panel records-panel"><div class="panel-heading records-heading"><div><p class="panel-kicker">REGISTROS QUE RESPALDAN LOS INDICADORES</p><h2>Tabla de consulta</h2><p class="panel-description">Solo muestra atributos catastrales y físicos necesarios para el análisis.</p></div><div class="export-actions"><button class="header-button secondary" id="export-csv" type="button">Descargar CSV</button><button class="header-button secondary" id="export-xlsx" type="button">Descargar Excel</button><button class="header-button secondary" id="export-pdf" type="button">Imprimir / PDF</button></div></div>
-        <div class="table-toolbar"><div class="record-tabs" role="tablist" aria-label="Tipo de registros"><button class="record-tab active" type="button" role="tab" aria-selected="true" data-record-tab="parcels">Predios <span id="table-parcel-count">—</span></button><button class="record-tab" type="button" role="tab" aria-selected="false" data-record-tab="buildings">Construcciones <span id="table-building-count">—</span></button></div><label>Buscar en la tabla<input id="table-search" type="search" placeholder="Filtrar registros visibles"></label></div>
+        <div class="table-toolbar"><div class="record-tabs" role="tablist" aria-label="Tipo de registros"><button class="record-tab active" type="button" role="tab" aria-selected="true" data-record-tab="parcels">Predios <span id="table-parcel-count">—</span></button><button class="record-tab" type="button" role="tab" aria-selected="false" data-record-tab="buildings">Construcciones <span id="table-building-count">—</span></button></div><label>Buscar por número catastral o matrícula<input id="table-search" type="search" placeholder="Filtrar por número predial o matrícula"></label></div>
         <div class="table-scroll"><table><thead id="records-head"></thead><tbody id="records-body"><tr><td class="empty-cell">Cargando las capas del estudio…</td></tr></tbody></table></div>
         <footer class="table-footer"><span id="table-status">Cargando información segura para análisis…</span><div><button id="table-prev" type="button" aria-label="Página anterior" disabled>←</button><span id="table-page">0 de 0</span><button id="table-next" type="button" aria-label="Página siguiente" disabled>→</button></div></footer>
       </section>

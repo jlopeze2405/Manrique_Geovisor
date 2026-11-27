@@ -34,7 +34,7 @@ function Read-SafeDbfRows {
   }
 
   $missing = @($Fields | Where-Object { -not $descriptors.ContainsKey($_) })
-  if ($missing.Count) { throw "Faltan campos requeridos en $Path: $($missing -join ', ')" }
+  if ($missing.Count) { throw "Faltan campos requeridos en ${Path}: $($missing -join ', ')" }
 
   $rows = [System.Collections.Generic.List[object]]::new()
   for ($rowIndex = 0; $rowIndex -lt $recordCount; $rowIndex++) {
@@ -101,7 +101,7 @@ $parcelPath = Join-Path $ProjectRoot 'data\Predios_Barrios_Estudio\Predios_Estud
 $buildingPath = Join-Path $ProjectRoot 'data\Construcciones_Barrios_Estudio\Construcciones.dbf'
 $parcelGeometryPath = Join-Path $ProjectRoot 'data\Predios_Barrios_Estudio\Predios_Estudio.shp'
 $buildingGeometryPath = Join-Path $ProjectRoot 'data\Construcciones_Barrios_Estudio\Construcciones.shp'
-$parcelFields = @('numero_pre', 'tipo_predi', 'destinacio', 'Shape_Area', 'riesgo', 'categoria')
+$parcelFields = @('numero_pre', 'matricula_', 'tipo_predi', 'destinacio', 'Shape_Area', 'riesgo', 'categoria')
 $buildingFields = @('cbml', 'id_constru', 'numero_pis', 'Shape_Area', 'riesgo', 'categoria')
 $parcelSignatures = Read-ShapeSignatures -Path $parcelGeometryPath
 $buildingSignatures = Read-ShapeSignatures -Path $buildingGeometryPath

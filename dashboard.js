@@ -125,6 +125,7 @@
       sourceId: numeric(item.sourceId),
       geometryHash: safeText(item.geometryHash),
       identifier: safeText(isParcel ? item.numero_pre : item.cbml),
+      matricula: safeText(isParcel ? item.matricula_ : ''),
       secondaryId: safeText(isParcel ? '' : item.id_constru),
       landType: safeText(item.tipo_predi),
       destination: safeText(item.destinacio),
@@ -154,6 +155,7 @@
           record.kind = kind;
           record.sourceRows = 1;
           record.identifiers = new Set(record.identifier ? [record.identifier] : []);
+          record.matriculas = new Set(record.matricula ? [record.matricula] : []);
           record.secondaryIdentifiers = new Set(record.secondaryId ? [record.secondaryId] : []);
           record._values = {};
           ['landType', 'destination', 'floors', 'area', 'risk', 'threat'].forEach(function (key) { record._values[key] = new Map([[record[key] == null ? '__NULL__' : String(record[key]), record[key]]]); });
@@ -161,6 +163,7 @@
         } else {
           existing.sourceRows++;
           if (record.identifier) existing.identifiers.add(record.identifier);
+          if (record.matricula) existing.matriculas.add(record.matricula);
           if (record.secondaryId) existing.secondaryIdentifiers.add(record.secondaryId);
           ['landType', 'destination', 'floors', 'area', 'risk', 'threat'].forEach(function (key) {
             var value = record[key]; existing._values[key].set(value == null ? '__NULL__' : String(value), value);
@@ -174,6 +177,7 @@
       record.identifierCount = record.identifiers.size;
       record.secondaryIdentifierCount = record.secondaryIdentifiers.size;
       record.identifier = Array.from(record.identifiers).join(' | ');
+      record.matricula = Array.from(record.matriculas).join(' | ');
       record.secondaryId = Array.from(record.secondaryIdentifiers).join(' | ');
       record.conflicts = {};
       Object.keys(record._values).forEach(function (key) {
@@ -278,7 +282,7 @@
     if (kind === 'parcels' && ignore !== 'destinations' && state.destinations.size && !state.destinations.has(record.destination)) return false;
     if (kind === 'buildings' && ignore !== 'floors' && state.floors.size && !state.floors.has(String(record.floors))) return false;
     if (state.search) {
-      var haystack = [record.identifier, record.secondaryId, record.landType, record.destination, record.neighborhood, record.risk, record.threat].join(' ').toLocaleLowerCase('es');
+      var haystack = [record.identifier, record.matricula].join(' ').toLocaleLowerCase('es');
       if (haystack.indexOf(state.search) === -1) return false;
     }
     return true;
@@ -473,7 +477,7 @@
     var records = filteredRecords(state.tableKind);
     var query = state.tableSearch;
     if (query) records = records.filter(function (record) {
-      return [record.identifier, record.secondaryId, record.landType, record.destination, record.neighborhood, record.risk, record.threat, record.floors, record.area].join(' ').toLocaleLowerCase('es').indexOf(query) !== -1;
+      return [record.identifier, record.matricula].join(' ').toLocaleLowerCase('es').indexOf(query) !== -1;
     });
     return records.slice().sort(function (a, b) {
       var av = a[state.sortKey], bv = b[state.sortKey];
@@ -484,7 +488,7 @@
   }
   function tableColumns(kind) {
     return kind === 'parcels' ? [
-      ['sourceId', 'Registro fuente'], ['sourceRows', 'Filas unidas'], ['identifier', 'N\u00FAmero predial'], ['landType', 'Tipo de predio'], ['destination', 'Destinaci\u00F3n'], ['area', '\u00C1rea geom\u00E9trica (m2)'], ['risk', 'Riesgo'], ['threat', 'Amenaza'], ['neighborhood', 'Barrio']
+      ['sourceId', 'Registro fuente'], ['sourceRows', 'Filas unidas'], ['identifier', 'N\u00FAmero predial'], ['matricula', 'Matr\u00EDcula'], ['landType', 'Tipo de predio'], ['destination', 'Destinaci\u00F3n'], ['area', '\u00C1rea geom\u00E9trica (m2)'], ['risk', 'Riesgo'], ['threat', 'Amenaza'], ['neighborhood', 'Barrio']
     ] : [
       ['sourceId', 'Registro fuente'], ['sourceRows', 'Filas unidas'], ['identifier', 'CBML'], ['secondaryId', 'ID construcci\u00F3n'], ['floors', 'N\u00FAmero de pisos'], ['area', '\u00C1rea geom\u00E9trica (m2)'], ['risk', 'Riesgo'], ['threat', 'Amenaza'], ['neighborhood', 'Barrio']
     ];
@@ -546,12 +550,12 @@
     var records = filteredRecords(kind);
     if (useTableSearch && kind === state.tableKind && state.tableSearch) {
       var query = state.tableSearch;
-      records = records.filter(function (r) { return [r.identifier, r.secondaryId, r.landType, r.destination, r.neighborhood, r.risk, r.threat, r.floors, r.area].join(' ').toLocaleLowerCase('es').indexOf(query) !== -1; });
+      records = records.filter(function (r) { return [r.identifier, r.matricula].join(' ').toLocaleLowerCase('es').indexOf(query) !== -1; });
     }
     return records;
   }
   function recordExportRow(record, kind) {
-    if (kind === 'parcels') return { numero_pre: record.identifier, tipo_predi: record.landType, destinacio: record.destination, Shape_Area: record.area, riesgo: record.risk, categoria: record.threat, barrio: record.neighborhood };
+    if (kind === 'parcels') return { numero_pre: record.identifier, matricula_: record.matricula, tipo_predi: record.landType, destinacio: record.destination, Shape_Area: record.area, riesgo: record.risk, categoria: record.threat, barrio: record.neighborhood };
     return { cbml: record.identifier, id_constru: record.secondaryId, numero_pis: record.floors, Shape_Area: record.area, riesgo: record.risk, categoria: record.threat, barrio: record.neighborhood };
   }
   function triggerDownload(blob, filename) {

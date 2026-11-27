@@ -429,7 +429,7 @@
     var entry = document.createElement('div'); entry.className = 'layer-control-entry'; entry._mapLayer = layer;
     if (!base) {
       entry.draggable = true; entry.title = 'Arrastra para cambiar el orden de dibujo';
-      entry.addEventListener('dragstart', function (event) { if (event.target.closest('button,input')) { event.preventDefault(); return; } draggedLayerEntry = entry; event.dataTransfer.effectAllowed = 'move'; });
+      entry.addEventListener('dragstart', function (event) { if (event.target.closest('button,input,.layer-download-menu')) { event.preventDefault(); return; } draggedLayerEntry = entry; event.dataTransfer.effectAllowed = 'move'; });
       entry.addEventListener('dragover', function (event) { if (draggedLayerEntry && draggedLayerEntry !== entry) { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; } });
       entry.addEventListener('drop', function (event) {
         event.preventDefault(); if (!draggedLayerEntry || draggedLayerEntry === entry) return;
@@ -486,6 +486,68 @@
       if (!canChangeColor) styleWrap.appendChild(colorLockNote);
       row._colorInput = colorInput; row._weightInput = weightInput;
     }
+  }
+
+  function isSensitiveParcelLayer(layer, name) {
+    return !!(layer && layer._sensitiveParcelData) || /Predios_Barrios_Estudio[\\/]Predios_Estudio/i.test(String(layer && layer._sourcePath || '')) || /(?:^|[^a-z])(predios?|parcels?)(?:[^a-z]|$)/i.test(String(name || ''));
+  }
+  function addLayerDownloadControl(row, layer, name) {
+    if (!row || !layer || !Array.isArray(layer.featureData) || !layer.featureData.length || isSensitiveParcelLayer(layer, name) || row.querySelector('.layer-download-menu')) return;
+    var details = document.createElement('details'); details.className = 'layer-download-menu';
+    var summary = document.createElement('summary'); summary.textContent = '⇩'; summary.title = 'Descargar esta capa'; summary.setAttribute('aria-label', 'Descargar capa ' + name);
+    var menu = document.createElement('div'); menu.className = 'layer-download-options';
+    [['geojson', 'GeoJSON'], ['kml', 'KML'], ['shp', 'Shapefile ZIP'], ['csv', 'CSV (atributos)']].forEach(function (format) {
+      var button = document.createElement('button'); button.type = 'button'; button.textContent = format[1];
+      button.addEventListener('click', function (event) { event.preventDefault(); event.stopPropagation(); details.open = false; exportVectorLayer(layer, name, format[0]); }); menu.appendChild(button);
+    });
+    details.append(summary, menu); details.addEventListener('click', function (event) { event.stopPropagation(); }); row.appendChild(details);
+  }
+  function exportVectorLayer(layer, name, format) {
+    if (!layer || !Array.isArray(layer.featureData) || !layer.featureData.length) { alert('La capa todavía no tiene datos cargados.'); return; }
+    if (isSensitiveParcelLayer(layer, name)) { alert('La capa de predios contiene información sensible y no se puede descargar.'); return; }
+    var features = layer.featureData.filter(function (feature) { return feature && feature.type === 'Feature' && feature.geometry; });
+    if (!features.length) { alert('No hay geometrías disponibles para exportar.'); return; }
+    var safeName = String(name || 'capa').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'capa';
+    if (format === 'geojson') {
+      downloadBlob(new Blob([JSON.stringify({ type: 'FeatureCollection', name: name, crs: { type: 'name', properties: { name: 'EPSG:4326' } }, features: features })], { type: 'application/geo+json;charset=utf-8' }), safeName + '.geojson'); return;
+    }
+    if (format === 'csv') {
+      var fields = Array.from(features.reduce(function (all, feature) { Object.keys(feature.properties || {}).forEach(function (key) { all.add(key); }); return all; }, new Set()));
+      function csvCell(value) { var text = value != null && typeof value === 'object' ? JSON.stringify(value) : String(value == null ? '' : value); return '"' + text.replace(/"/g, '""') + '"'; }
+      var csv = '\ufeff' + [fields.map(csvCell).join(','), features.map(function (feature) { return fields.map(function (key) { return csvCell((feature.properties || {})[key]); }).join(','); }).join('\r\n')].join('\r\n');
+      downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), safeName + '.csv'); return;
+    }
+    if (format === 'shp') {
+      if (!window.shpwrite || typeof window.shpwrite.zip !== 'function') { alert('El exportador Shapefile no está disponible.'); return; }
+      var supported = features.filter(function (feature) { return feature.geometry.type !== 'GeometryCollection'; });
+      if (!supported.length) { alert('No hay geometrías compatibles con Shapefile.'); return; }
+      try {
+        window.shpwrite.zip({ type: 'FeatureCollection', features: supported }, { folder: safeName, filename: safeName, outputType: 'blob', types: { point: 'puntos', polyline: 'lineas', polygon: 'poligonos' }, prj: 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433]]' }).then(function (blob) { downloadBlob(blob, safeName + '.zip'); }).catch(function (error) { alert('No se pudo crear el Shapefile: ' + error.message); });
+      } catch (error) { alert('No se pudo crear el Shapefile: ' + error.message); }
+      return;
+    }
+    function xml(value) { return String(value == null ? '' : typeof value === 'object' ? JSON.stringify(value) : value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;'); }
+    function coords(points) { return (points || []).map(function (point) { return point[0] + ',' + point[1] + (point[2] == null ? '' : ',' + point[2]); }).join(' '); }
+    function boundary(ring, tag) { return '<' + tag + '><LinearRing><coordinates>' + coords(ring) + '</coordinates></LinearRing></' + tag + '>'; }
+    function polygonXml(rings) { return '<Polygon>' + boundary((rings || [])[0] || [], 'outerBoundaryIs') + (rings || []).slice(1).map(function (ring) { return boundary(ring, 'innerBoundaryIs'); }).join('') + '</Polygon>'; }
+    function geometryXml(geometry) {
+      if (!geometry) return '';
+      if (geometry.type === 'Point') return '<Point><coordinates>' + coords([geometry.coordinates]) + '</coordinates></Point>';
+      if (geometry.type === 'MultiPoint') return '<MultiGeometry>' + geometry.coordinates.map(function (point) { return geometryXml({ type: 'Point', coordinates: point }); }).join('') + '</MultiGeometry>';
+      if (geometry.type === 'LineString') return '<LineString><tessellate>1</tessellate><coordinates>' + coords(geometry.coordinates) + '</coordinates></LineString>';
+      if (geometry.type === 'MultiLineString') return '<MultiGeometry>' + geometry.coordinates.map(function (line) { return geometryXml({ type: 'LineString', coordinates: line }); }).join('') + '</MultiGeometry>';
+      if (geometry.type === 'Polygon') return polygonXml(geometry.coordinates);
+      if (geometry.type === 'MultiPolygon') return '<MultiGeometry>' + geometry.coordinates.map(polygonXml).join('') + '</MultiGeometry>';
+      if (geometry.type === 'GeometryCollection') return '<MultiGeometry>' + (geometry.geometries || []).map(geometryXml).join('') + '</MultiGeometry>';
+      return '';
+    }
+    var placemarks = features.map(function (feature, index) {
+      var properties = feature.properties || {}, label = properties.name || properties.nombre || properties.numero_pre || properties.matricula_ || properties.cbml || (name + ' ' + (index + 1));
+      var values = Object.keys(properties).map(function (key) { return '<Data name="' + xml(key) + '"><value>' + xml(properties[key]) + '</value></Data>'; }).join('');
+      return '<Placemark><name>' + xml(label) + '</name><ExtendedData>' + values + '</ExtendedData>' + geometryXml(feature.geometry) + '</Placemark>';
+    }).join('');
+    var kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>' + xml(name) + '</name>' + placemarks + '</Document></kml>';
+    downloadBlob(new Blob([kml], { type: 'application/vnd.google-earth.kml+xml;charset=utf-8' }), safeName + '.kml');
   }
 
   addLayerControl('Imagen satelital', imagery, '#1976d2', true, true);
@@ -633,6 +695,156 @@
     row.append(key, text); host.appendChild(row);
   }
 
+  function cadastralSection(title, entries, host) {
+    var section = document.createElement('section'); section.className = 'cadastral-sheet-section';
+    var heading = document.createElement('h2'); heading.textContent = title; section.appendChild(heading);
+    var grid = document.createElement('dl'); grid.className = 'cadastral-sheet-grid';
+    entries.forEach(function (entry) {
+      var term = document.createElement('dt'); term.textContent = entry[0];
+      var value = document.createElement('dd'); value.textContent = entry[1] == null || String(entry[1]).trim() === '' ? 'N/A' : String(entry[1]);
+      grid.append(term, value);
+    });
+    section.appendChild(grid); host.appendChild(section);
+  }
+
+  function cadastralMetricGeometry(geometry) {
+    var polygons = geometry && geometry.type === 'Polygon' ? [geometry.coordinates] : (geometry && geometry.type === 'MultiPolygon' ? geometry.coordinates : []);
+    if (!window.proj4 || !polygons.length) throw new Error('La geometría del predio no es poligonal o Proj4 no está disponible.');
+    return polygons.map(function (polygon) {
+      return (polygon || []).map(function (ring) {
+        return (ring || []).map(function (coordinate) {
+          var projected = proj4('EPSG:4326', 'EPSG:9377', [coordinate[0], coordinate[1]]);
+          return [projected[0], projected[1]];
+        });
+      });
+    });
+  }
+
+  function cadastralDistance(a, b) { return Math.hypot(b[0] - a[0], b[1] - a[1]); }
+  function cadastralRingArea(ring) {
+    var sum = 0;
+    for (var i = 1; i < ring.length; i++) sum += ring[i - 1][0] * ring[i][1] - ring[i][0] * ring[i - 1][1];
+    return Math.abs(sum) / 2;
+  }
+  function cadastralLabel(index) { return index < 26 ? String.fromCharCode(65 + index) : 'A' + (index - 25); }
+  function cadastralSvgElement(name, attrs, text) {
+    var node = document.createElementNS('http://www.w3.org/2000/svg', name);
+    Object.keys(attrs || {}).forEach(function (key) { node.setAttribute(key, String(attrs[key])); });
+    if (text != null) node.textContent = text;
+    return node;
+  }
+
+  function buildCadastralPlan(feature, host) {
+    var metricPolygons = cadastralMetricGeometry(feature.geometry);
+    var exteriorPoints = metricPolygons.map(function (poly) { return poly[0] || []; }).reduce(function (all, ring) { return all.concat(ring); }, []);
+    if (!exteriorPoints.length) throw new Error('El lote no tiene vértices disponibles.');
+    var bounds = exteriorPoints.reduce(function (b, point) { b.minX = Math.min(b.minX, point[0]); b.maxX = Math.max(b.maxX, point[0]); b.minY = Math.min(b.minY, point[1]); b.maxY = Math.max(b.maxY, point[1]); return b; }, { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity });
+    var width = Math.max(0.1, bounds.maxX - bounds.minX), height = Math.max(0.1, bounds.maxY - bounds.minY);
+    var svgWidth = 900, svgHeight = 560, margin = 76;
+    var scale = Math.min((svgWidth - margin * 2) / width, (svgHeight - margin * 2) / height);
+    var drawWidth = width * scale, drawHeight = height * scale;
+    var offsetX = (svgWidth - drawWidth) / 2, offsetY = (svgHeight - drawHeight) / 2;
+    function xy(point) { return [offsetX + (point[0] - bounds.minX) * scale, svgHeight - offsetY - (point[1] - bounds.minY) * scale]; }
+    var svg = cadastralSvgElement('svg', { viewBox: '0 0 ' + svgWidth + ' ' + svgHeight, role: 'img', 'aria-label': 'Plano planimétrico del predio con linderos y vértices' });
+    svg.appendChild(cadastralSvgElement('rect', { x: 20, y: 20, width: svgWidth - 40, height: svgHeight - 40, fill: '#fff', stroke: '#506575', 'stroke-width': 1 }));
+    svg.appendChild(cadastralSvgElement('text', { x: svgWidth / 2, y: 39, class: 'plan-crs-label', 'text-anchor': 'middle' }, 'E ' + bounds.minX.toFixed(0) + ' — ' + bounds.maxX.toFixed(0) + ' m'));
+    svg.appendChild(cadastralSvgElement('text', { x: 38, y: svgHeight / 2, class: 'plan-crs-label', 'text-anchor': 'middle', transform: 'rotate(-90 38 ' + svgHeight / 2 + ')' }, 'N ' + bounds.minY.toFixed(0) + ' — ' + bounds.maxY.toFixed(0) + ' m'));
+    var vertices = [], segments = [], area = 0, perimeter = 0, vertexIndex = 0;
+    metricPolygons.forEach(function (polygon) {
+      var pathData = '';
+      polygon.forEach(function (ring, ringIndex) {
+        if (!ring || ring.length < 4) return;
+        if (ringIndex === 0) area += cadastralRingArea(ring); else area -= cadastralRingArea(ring);
+        ring.forEach(function (point, index) {
+          var p = xy(point); pathData += (index === 0 ? 'M' : 'L') + p[0].toFixed(2) + ',' + p[1].toFixed(2);
+          if (index < ring.length - 1) {
+            var next = ring[index + 1], q = xy(next), length = cadastralDistance(point, next);
+            perimeter += length;
+            segments.push({ a: point, b: next, length: length, mid: [(point[0] + next[0]) / 2, (point[1] + next[1]) / 2] });
+          }
+          if (index < ring.length - 1) vertices.push({ label: cadastralLabel(vertexIndex++), xy: point, ring: vertices.length ? vertices[vertices.length - 1].ring : 1 });
+        });
+        pathData += 'Z ';
+      });
+      svg.appendChild(cadastralSvgElement('path', { d: pathData, fill: '#d9eff1', 'fill-rule': 'evenodd', stroke: '#087e8b', 'stroke-width': 3, 'stroke-linejoin': 'round' }));
+    });
+    segments.forEach(function (segment) {
+      var p = xy(segment.mid);
+      svg.appendChild(cadastralSvgElement('text', { x: p[0], y: p[1] - 4, class: 'plan-segment-label', 'text-anchor': 'middle' }, segment.length.toFixed(2) + ' m'));
+    });
+    vertices.forEach(function (vertex) {
+      var p = xy(vertex.xy);
+      svg.appendChild(cadastralSvgElement('circle', { cx: p[0], cy: p[1], r: 4, fill: '#b42332', stroke: '#fff', 'stroke-width': 1.5 }));
+      svg.appendChild(cadastralSvgElement('text', { x: p[0] + 7, y: p[1] - 7, class: 'plan-vertex-label' }, vertex.label));
+    });
+    svg.appendChild(cadastralSvgElement('text', { x: svgWidth - 72, y: 68, class: 'plan-north', 'text-anchor': 'middle' }, 'N'));
+    svg.appendChild(cadastralSvgElement('path', { d: 'M828 122 L828 78 M828 78 L818 98 M828 78 L838 98', fill: 'none', stroke: '#173b4f', 'stroke-width': 3 }));
+    var targetLength = width / 4, exponent = Math.floor(Math.log10(targetLength || 1)), unit = Math.pow(10, exponent), scaleLength = [5, 2, 1].map(function (factor) { return factor * unit; }).find(function (value) { return value <= targetLength; }) || unit;
+    var barWidth = scaleLength * scale, barX = 58, barY = svgHeight - 52;
+    svg.appendChild(cadastralSvgElement('rect', { x: barX, y: barY, width: barWidth, height: 8, fill: '#173b4f' }));
+    svg.appendChild(cadastralSvgElement('rect', { x: barX, y: barY, width: barWidth / 2, height: 8, fill: '#fff', stroke: '#173b4f', 'stroke-width': 1 }));
+    svg.appendChild(cadastralSvgElement('text', { x: barX, y: barY - 8, class: 'plan-scale-label' }, '0'));
+    svg.appendChild(cadastralSvgElement('text', { x: barX + barWidth, y: barY - 8, class: 'plan-scale-label', 'text-anchor': 'end' }, scaleLength + ' m'));
+    svg.appendChild(cadastralSvgElement('text', { x: svgWidth / 2, y: svgHeight - 29, class: 'plan-crs-label', 'text-anchor': 'middle' }, 'MAGNA-SIRGAS 2018 / Origen-Nacional · EPSG:9377'));
+    host.appendChild(svg);
+    var verticesTable = document.createElement('table'); verticesTable.className = 'cadastral-coordinate-table';
+    var thead = document.createElement('thead'), headRow = document.createElement('tr');
+    ['Vértice', 'Este (m)', 'Norte (m)', 'Lindero siguiente (m)'].forEach(function (label) { var th = document.createElement('th'); th.textContent = label; headRow.appendChild(th); });
+    thead.appendChild(headRow); verticesTable.appendChild(thead);
+    var tbody = document.createElement('tbody');
+    var segmentIndex = 0;
+    metricPolygons.forEach(function (polygon) { (polygon || []).forEach(function (ring) {
+      if (!ring || ring.length < 4) return;
+      for (var i = 0; i < ring.length - 1; i++) {
+        var row = document.createElement('tr'), label = document.createElement('td'), east = document.createElement('td'), north = document.createElement('td'), edge = document.createElement('td');
+        label.textContent = cadastralLabel(segmentIndex); east.textContent = ring[i][0].toFixed(3); north.textContent = ring[i][1].toFixed(3); edge.textContent = cadastralDistance(ring[i], ring[i + 1]).toFixed(2);
+        row.append(label, east, north, edge); tbody.appendChild(row); segmentIndex++;
+      }
+    }); });
+    verticesTable.appendChild(tbody); host.appendChild(verticesTable);
+    return { area: Math.max(0, area), perimeter: perimeter, vertexCount: vertices.length, width: width };
+  }
+
+  function generateCadastralSheet(feature) {
+    var dialog = document.getElementById('cadastral-sheet-dialog'), host = document.getElementById('cadastral-sheet-content');
+    if (!feature || !feature.geometry) return;
+    host.textContent = '';
+    var title = document.createElement('h1'); title.id = 'cadastral-sheet-title'; title.textContent = 'Ficha Catastral Simplificada'; host.appendChild(title);
+    var subtitle = document.createElement('p'); subtitle.className = 'cadastral-sheet-subtitle'; subtitle.textContent = 'Consulta por número predial o matrícula · Generada ' + new Date().toLocaleDateString('es-CO'); host.appendChild(subtitle);
+    var planFigure = document.createElement('figure'); planFigure.className = 'cadastral-plan-figure';
+    var properties = feature.properties || {}, get = function (key) { return propertyValue(properties, [key]); };
+    var metrics;
+    try { metrics = buildCadastralPlan(feature, planFigure); }
+    catch (error) { alert('No se pudo generar el plano: ' + error.message); return; }
+    var primary = [
+      ['Número predial', get('numero_pre')], ['Matrícula', get('matricula_')], ['CBML', get('cbml')], ['Código DIVIPOLA', get('cod_divipo')],
+      ['Dirección / nomenclatura', get('direccion') || get('nomenclatura')], ['Barrio / sector', neighborhoodForFeature(feature) || get('barrio') || get('sector')],
+      ['Municipio', get('municipio')], ['Zona', get('zona')], ['Condición', get('condicion_')], ['Destinación', get('destinacio')], ['Tipo de predio', get('tipo_predi')],
+      ['Área geométrica calculada (m²)', metrics.area.toFixed(2)], ['Área registrada (m²)', get('Shape_Area')], ['Perímetro calculado (m)', metrics.perimeter.toFixed(2)]
+    ];
+    cadastralSection('Identificación y características', primary, host);
+    var relatedBuildings = constructionFilterFeatures.filter(function (building) { return geometriesIntersect(building, feature); });
+    var builtArea = relatedBuildings.reduce(function (sum, building) { var val = Number(propertyValue(building.properties || {}, ['Shape_Area', 'area_const'])); return sum + (Number.isFinite(val) && val > 0 ? val : 0); }, 0);
+    cadastralSection('Construcciones por intersección espacial', [['Construcciones que intersectan', constructionFilterFeatures.length ? relatedBuildings.length : 'N/A · capa no cargada'], ['Suma de áreas registradas en la capa (m²)', constructionFilterFeatures.length ? (builtArea ? builtArea.toFixed(2) : 'N/A') : 'N/A · capa no cargada']], host);
+    var neighborFields = Object.keys(properties).filter(function (key) { return /linder|colind|vecin|frente|norte|sur|oriente|occidente/i.test(key); });
+    cadastralSection('Colindantes y linderos', neighborFields.length ? neighborFields.map(function (key) { return [key, properties[key]]; }) : [['Colindantes en atributos', 'No disponibles en la capa. Consulte longitudes y vértices del lindero en el plano.']], host);
+    var riskFields = Object.keys(properties).filter(function (key) { return /riesgo|amenaz|categoria/i.test(key); });
+    cadastralSection('Riesgo y amenaza registrados', riskFields.length ? riskFields.map(function (key) { return [key, properties[key]]; }) : [['Clasificación', 'N/A · no existe en los atributos del predio']], host);
+    var valueFields = Object.keys(properties).filter(function (key) { return /avalu|valor|precio/i.test(key); });
+    cadastralSection('Avalúos registrados', valueFields.length ? valueFields.map(function (key) { return [key, properties[key]]; }) : [['Avalúo', 'N/A · no existe en los atributos del predio']], host);
+    var planSection = document.createElement('section'); planSection.className = 'cadastral-sheet-section cadastral-plan-section';
+    var planTitle = document.createElement('h2'); planTitle.textContent = 'Plano planimétrico'; planSection.appendChild(planTitle);
+    planSection.appendChild(planFigure);
+    var scaleDenominator = Math.max(1, Math.round((metrics.width * 1000 / 190) / 100) * 100);
+    var caption = document.createElement('figcaption'); caption.textContent = metrics.vertexCount + ' vértices · Perímetro ' + metrics.perimeter.toFixed(2) + ' m · Área planimétrica ' + metrics.area.toFixed(2) + ' m² · Escala de impresión aproximada 1:' + scaleDenominator.toLocaleString('es-CO') + '. Longitudes y coordenadas calculadas desde la geometría transformada a EPSG:9377.'; planSection.appendChild(caption);
+    host.appendChild(planSection);
+    var technical = document.createElement('p'); technical.className = 'cadastral-sheet-note'; technical.textContent = 'SRC de la capa: MAGNA-SIRGAS 2018 / Origen-Nacional (EPSG:9377). Las longitudes y áreas se calculan a partir de la geometría disponible. Los datos no presentes en la capa se indican como N/A; las intersecciones espaciales no certifican linderos jurídicos.'; host.appendChild(technical);
+    var known = new Set(['fid_', 'cod_divipo', 'departamen', 'municipio', 'numero_pre', 'matricula_', 'zona', 'condicion_', 'destinacio', 'tipo_predi', 'tipo_derec', 'valor_come', 'avaluo_cat', 'valor_co_1', 'avaluo_c_1', 'valor_co_2', 'avaluo_c_2', 'Shape_Leng', 'Shape_Area', 'riesgo', 'categoria', 'cbml', 'direccion', 'nomenclatura', 'barrio', 'sector']);
+    var otherFields = Object.keys(properties).filter(function (key) { return !known.has(key); });
+    if (otherFields.length) cadastralSection('Otros atributos disponibles en la capa', otherFields.map(function (key) { return [key, properties[key]]; }), host);
+    if (!dialog.open) dialog.showModal();
+  }
+
   function showFeatureInspector(layer) {
     if (!layer || !layer.feature) return;
     var feature = layer.feature, properties = feature.properties || {};
@@ -654,6 +866,8 @@
     });
     var shareButton = document.getElementById('inspector-share');
     if (shareButton) shareButton.hidden = !(isParcel || isConstruction);
+    var sheetButton = document.getElementById('inspector-cadastral-sheet');
+    if (sheetButton) sheetButton.hidden = !isParcel;
     selectedInspectorLayer = layer;
     panel.hidden = false;
   }
@@ -1095,7 +1309,7 @@
     var query = entityFilter ? normalizedText(entityFilter.value.trim()) : '';
     if (query) {
       var p = feature.properties || {};
-      var ids = ['fid_', 'numero_pre', 'matricula_', 'id_constru', 'cbml', 'numero_edi', 'numero_mej'];
+      var ids = ['numero_pre', 'matricula_'];
       if (!ids.some(function (field) { var value = propertyValue(p, [field]); return value !== '' && normalizedText(value).indexOf(query) !== -1; })) return false;
     }
     return true;
@@ -1222,7 +1436,7 @@
   if (entityFilter) entityFilter.addEventListener('input', applyDataFilters);
 
   var buildingDiagnosticForm = document.getElementById('building-diagnostic-form');
-  var buildingDiagnosticInput = document.getElementById('building-diagnostic-cbml');
+  var buildingDiagnosticInput = document.getElementById('building-diagnostic-identifier');
   var buildingDiagnosticStatus = document.getElementById('building-diagnostic-status');
   var buildingDiagnosticCandidates = document.getElementById('building-diagnostic-candidates');
   var buildingDiagnosticRecord = document.getElementById('building-diagnostic-record');
@@ -1231,17 +1445,7 @@
   function setBuildingDiagnosticReady(features) {
     buildingDiagnosticFeaturesReady = true;
     if (buildingDiagnosticSearchButton) buildingDiagnosticSearchButton.disabled = false;
-    if (buildingDiagnosticStatus) buildingDiagnosticStatus.textContent = 'Capa disponible: ' + features.length.toLocaleString('es') + ' construcciones. La búsqueda compara el CBML completo.';
-  }
-
-  function normalizeBuildingCbml(value) {
-    var normalized = String(value == null ? '' : value).trim().replace(/\.0+$/, '');
-    if (/^\d{1,11}$/.test(normalized)) return normalized.padStart(11, '0');
-    if (/^\d+(?:\.\d+)?e[+-]?\d+$/i.test(normalized)) {
-      var numeric = Number(normalized);
-      if (Number.isSafeInteger(numeric) && numeric >= 0) return String(numeric).padStart(11, '0');
-    }
-    return normalized;
+    if (buildingDiagnosticStatus) buildingDiagnosticStatus.textContent = 'Capa disponible: ' + features.length.toLocaleString('es') + ' construcciones. Busca por número predial o matrícula.';
   }
 
   function buildingDiagnosticSourceValue(properties, aliases) {
@@ -1271,7 +1475,7 @@
   function renderBuildingDiagnosticRecord(feature, sourceIndex, matchIndex) {
     buildingDiagnosticSelectedFeature = feature;
     var properties = feature.properties || {};
-    document.getElementById('building-diagnostic-record-id').textContent = 'CBML ' + buildingDiagnosticSourceValue(properties, ['cbml']) + ' · Registro de capa ' + (sourceIndex + 1) + (matchIndex == null ? '' : ' · Resultado ' + (matchIndex + 1));
+    document.getElementById('building-diagnostic-record-id').textContent = 'ID de construcción ' + buildingDiagnosticSourceValue(properties, ['id_constru']) + ' · Registro de capa ' + (sourceIndex + 1) + (matchIndex == null ? '' : ' · Resultado ' + (matchIndex + 1));
     var attributes = document.getElementById('building-diagnostic-attributes');
     attributes.textContent = '';
     appendBuildingDiagnosticAttribute(attributes, 'ID de construcción (fuente)', buildingDiagnosticSourceValue(properties, ['id_constru']));
@@ -1292,13 +1496,13 @@
 
   if (buildingDiagnosticForm) buildingDiagnosticForm.addEventListener('submit', function (event) {
     event.preventDefault();
-    var requestedCbml = buildingDiagnosticInput.value.trim();
+    var requestedIdentifier = normalizedText(buildingDiagnosticInput.value.trim());
     buildingDiagnosticRecord.hidden = true;
     buildingDiagnosticCandidates.textContent = '';
     buildingDiagnosticHighlight.clearLayers();
     buildingDiagnosticSelectedFeature = null;
-    if (!/^\d{11}$/.test(requestedCbml)) {
-      buildingDiagnosticStatus.textContent = 'Escribe un CBML de exactamente 11 dígitos.';
+    if (!requestedIdentifier) {
+      buildingDiagnosticStatus.textContent = 'Escribe un número predial o una matrícula.';
       buildingDiagnosticInput.focus();
       return;
     }
@@ -1306,16 +1510,27 @@
       buildingDiagnosticStatus.textContent = 'La capa de construcciones aún se está cargando. Intenta de nuevo en unos segundos.';
       return;
     }
-    var matches = constructionFilterFeatures.filter(function (feature) {
-      return normalizeBuildingCbml(buildingDiagnosticSourceValue(feature.properties, ['cbml'])) === requestedCbml;
+    var matchingParcels = parcelFilterFeatures.filter(function (feature) {
+      var properties = feature.properties || {};
+      return ['numero_pre', 'matricula_'].some(function (field) {
+        var value = normalizedText(buildingDiagnosticSourceValue(properties, [field]));
+        return value && value.indexOf(requestedIdentifier) !== -1;
+      });
+    });
+    if (!matchingParcels.length) {
+      buildingDiagnosticStatus.textContent = 'No se encontró ningún predio con ese número catastral o matrícula.';
+      return;
+    }
+    var matches = constructionFilterFeatures.filter(function (building) {
+      return matchingParcels.some(function (parcel) { return geometriesIntersect(building, parcel); });
     });
     if (!matches.length) {
-      buildingDiagnosticStatus.textContent = 'No se encontraron construcciones para ese CBML en la capa disponible.';
+      buildingDiagnosticStatus.textContent = 'Se encontró el predio, pero no hay construcciones que intersecten su geometría en la capa disponible.';
       return;
     }
     buildingDiagnosticStatus.textContent = matches.length === 1
-      ? 'Se encontró 1 construcción; se muestra su ficha preliminar.'
-      : 'Se encontraron ' + matches.length.toLocaleString('es') + ' construcciones asociadas a este CBML. Selecciona el registro que quieres revisar.';
+      ? 'Se encontró 1 construcción asociada al predio; se muestra su ficha preliminar.'
+      : 'Se encontraron ' + matches.length.toLocaleString('es') + ' construcciones asociadas espacialmente al predio. Selecciona el registro que quieres revisar.';
     matches.forEach(function (feature, matchIndex) {
       var sourceIndex = constructionFilterFeatures.indexOf(feature);
       var properties = feature.properties || {};
@@ -1345,7 +1560,7 @@
     buildingDiagnosticHighlight.clearLayers();
     buildingDiagnosticSelectedFeature = null;
     buildingDiagnosticStatus.textContent = buildingDiagnosticFeaturesReady
-      ? 'Capa disponible: ' + constructionFilterFeatures.length.toLocaleString('es') + ' construcciones. La búsqueda compara el CBML completo.'
+      ? 'Capa disponible: ' + constructionFilterFeatures.length.toLocaleString('es') + ' construcciones. Busca por número predial o matrícula.'
       : 'La búsqueda estará disponible cuando termine de cargar la capa de construcciones.';
   });
 
@@ -1670,6 +1885,8 @@
       group.addLayer(layer);
       if (row && row.querySelector('input').checked && !map.hasLayer(group)) group.addTo(map);
       group.featureData = features;
+      if (isParcelLayer) group._sensitiveParcelData = true;
+      addLayerDownloadControl(row, group, name);
       if (isConstructionLayer) setBuildingDiagnosticReady(features);
       var controlEntry = row && row.parentElement;
       if (controlEntry && controlEntry._customStyle) applyThemeStyle(layer, row._colorInput.value, Number(row._weightInput.value), false);
@@ -1841,7 +2058,7 @@
     var row = Array.from(layerList.querySelectorAll('.layer-item')).find(function (item) { return item.querySelector('label').textContent === label; });
     if (row) row.querySelector('.layer-state').textContent = 'ON';
     if (row) addTemporaryDeleteButton(row, label);
-    if (row) { var table = document.createElement('button'); table.type = 'button'; table.className = 'layer-table-button'; table.textContent = 'Tabla'; table.addEventListener('click', function (event) { event.preventDefault(); event.stopPropagation(); showAttributeTable(label, group.featureData); }); row.appendChild(table); }
+    if (row) { var table = document.createElement('button'); table.type = 'button'; table.className = 'layer-table-button'; table.textContent = 'Tabla'; table.addEventListener('click', function (event) { event.preventDefault(); event.stopPropagation(); showAttributeTable(label, group.featureData); }); row.appendChild(table); addLayerDownloadControl(row, group, label); }
     return { group: group, name: label, count: features.length };
   }
 
@@ -2460,6 +2677,19 @@
   });
   document.getElementById('inspector-close').addEventListener('click', function () { document.getElementById('feature-inspector').hidden = true; });
   document.getElementById('inspector-zoom').addEventListener('click', function () { var bounds = getLayerBounds(selectedInspectorLayer); if (bounds) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 18 }); });
+  document.getElementById('inspector-cadastral-sheet').addEventListener('click', function () {
+    if (selectedInspectorLayer && selectedInspectorLayer._isParcelLayer) generateCadastralSheet(selectedInspectorLayer.feature);
+  });
+  document.getElementById('cadastral-sheet-close').addEventListener('click', function () { document.getElementById('cadastral-sheet-dialog').close(); });
+  document.getElementById('cadastral-sheet-print').addEventListener('click', function () {
+    var printWindow = window.open('', '_blank');
+    if (!printWindow) { alert('El navegador bloqueó la ventana de impresión. Permite ventanas emergentes para imprimir la ficha.'); return; }
+    var content = document.getElementById('cadastral-sheet-content').outerHTML;
+    printWindow.document.open();
+    printWindow.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Ficha Catastral Simplificada</title><style>@page{size:A4;margin:14mm}*{box-sizing:border-box}body{font:10pt Arial,sans-serif;color:#173b4f;margin:0}h1{font-size:20pt;margin:0 0 4px}.cadastral-sheet-subtitle{color:#607687;font-size:9pt;margin:0 0 12px}.cadastral-sheet-section{break-inside:avoid;margin:10px 0;padding:9px;border:1px solid #cbd8df;border-radius:5px}.cadastral-sheet-section h2{font-size:12pt;margin:0 0 7px}.cadastral-sheet-grid{display:grid;grid-template-columns:1fr 1fr;grid-auto-flow:row;gap:3px 12px;margin:0}.cadastral-sheet-grid dt{font-weight:bold}.cadastral-sheet-grid dd{margin:0;overflow-wrap:anywhere}.cadastral-plan-section{break-before:page;break-inside:auto}.cadastral-plan-figure{margin:0}.cadastral-plan-figure svg{display:block;width:100%;max-height:135mm}.plan-segment-label{font:10px Arial;fill:#173b4f;paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round}.plan-vertex-label{font:bold 13px Arial;fill:#b42332;paint-order:stroke;stroke:#fff;stroke-width:3px}.plan-north{font:bold 18px Arial;fill:#173b4f}.plan-scale-label,.plan-crs-label{font:10px Arial;fill:#173b4f}.cadastral-coordinate-table{width:100%;border-collapse:collapse;font-size:8pt;margin-top:8px}.cadastral-coordinate-table th,.cadastral-coordinate-table td{border:1px solid #cbd8df;padding:4px;text-align:right}.cadastral-coordinate-table th:first-child,.cadastral-coordinate-table td:first-child{text-align:center}.cadastral-coordinate-table th{background:#eef4f6}.cadastral-coordinate-table tr{break-inside:avoid}.cadastral-sheet-note{font-size:8pt;color:#526979}.cadastral-sheet-section dd{font-size:9pt}figure figcaption{font-size:8pt;margin-top:4px}</style></head><body>' + content + '</body></html>');
+    printWindow.document.close();
+    window.setTimeout(function () { printWindow.focus(); printWindow.print(); }, 250);
+  });
   document.getElementById('inspector-share').addEventListener('click', async function () {
     var feature = selectedInspectorLayer && selectedInspectorLayer.feature;
     if (!feature) { document.getElementById('inspector-share-status').textContent = 'Selecciona un predio o una construcción primero.'; return; }

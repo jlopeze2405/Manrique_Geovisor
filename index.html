@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="workspace.css?v=uva-marker-1">
+  <link rel="stylesheet" href="workspace.css?v=cadastral-sheet-1">
 </head>
 <body>
   <main class="app-shell">
@@ -22,7 +22,7 @@
         </div>
       </header>
 
-      <details class="quick-guide panel-section"><summary>Gu&iacute;a r&aacute;pida &middot; c&oacute;mo consultar</summary><ol><li>Activa las capas que quieras ver.</li><li>Usa &laquo;Consultar&raquo; para filtrar por riesgo, barrio o identificador.</li><li>Selecciona un predio o construcci&oacute;n para ver sus datos.</li><li>Usa &laquo;Herramientas&raquo; para medir o dibujar.</li></ol></details>
+      <details class="quick-guide panel-section"><summary>Gu&iacute;a r&aacute;pida &middot; c&oacute;mo consultar</summary><ol><li>Activa las capas que quieras ver.</li><li>Usa &laquo;Consultar&raquo; para filtrar por riesgo, barrio, n&uacute;mero predial o matr&iacute;cula.</li><li>Activa la selecci&oacute;n y elige un predio; en su ficha puedes generar el plano planim&eacute;trico.</li><li>Usa &laquo;Herramientas&raquo; para medir o dibujar.</li></ol></details>
 
       <nav class="workspace-tabs" role="tablist" aria-label="Secciones del geovisor">
         <button class="workspace-tab active" id="workspace-tab-layers" type="button" role="tab" aria-selected="true" aria-controls="workspace-panel-layers" tabindex="0" data-workspace-tab="layers"><span aria-hidden="true">▤</span> Capas</button>
@@ -50,7 +50,7 @@
           <select id="neighborhood-filter"><option value="all">Todos los barrios</option><option value="Santa Inés">Santa Inés</option><option value="Las Granjas">Las Granjas</option><option value="San José La Cima No.2">San José La Cima II</option><option value="Oriente">Oriente</option></select>
         </label>
         <label class="filter-field">Identificador predial o construcción
-          <input id="entity-filter" type="search" placeholder="FID, matrícula, CBML o ID">
+          <input id="entity-filter" type="search" placeholder="Número predial o matrícula">
         </label>
       </section>
       <section class="panel-section spatial-query-panel" aria-label="Consulta por área dibujada">
@@ -76,11 +76,11 @@
       </details>
 
       <section class="panel-section building-diagnostic" aria-labelledby="building-diagnostic-title">
-        <div class="section-heading"><span class="section-icon" aria-hidden="true">⌕</span><div><h2 id="building-diagnostic-title">Diagnóstico individual de construcción</h2><p>Consulta por CBML · borrador</p></div><span class="diagnostic-draft-tag">BORRADOR</span></div>
-          <p class="diagnostic-intro">Busca el CBML exacto de la capa de construcciones. Un mismo CBML puede agrupar varias construcciones; selecciona el registro que quieres revisar. El número de registro solo identifica su posición en el archivo cargado.</p>
+        <div class="section-heading"><span class="section-icon" aria-hidden="true">⌕</span><div><h2 id="building-diagnostic-title">Diagnóstico individual de construcción</h2><p>Consulta por número predial o matrícula · borrador</p></div><span class="diagnostic-draft-tag">BORRADOR</span></div>
+          <p class="diagnostic-intro">Busca un predio por su número catastral o matrícula para consultar las construcciones que intersectan su geometría. Selecciona el registro que quieres revisar.</p>
         <form id="building-diagnostic-form" class="diagnostic-search-form" novalidate>
-          <label class="filter-field" for="building-diagnostic-cbml">CBML de 11 dígitos
-            <input id="building-diagnostic-cbml" name="cbml" type="text" inputmode="numeric" autocomplete="off" maxlength="11" pattern="[0-9]{11}" placeholder="Escribe los 11 dígitos" aria-describedby="building-diagnostic-status">
+          <label class="filter-field" for="building-diagnostic-identifier">Número catastral o matrícula
+            <input id="building-diagnostic-identifier" name="identificador-predial" type="search" autocomplete="off" placeholder="Escribe el número predial o matrícula" aria-describedby="building-diagnostic-status">
           </label>
           <div class="diagnostic-actions"><button class="action-button" id="building-diagnostic-search" type="submit">Buscar construcciones</button><button class="secondary-action" id="building-diagnostic-clear" type="button">Limpiar</button></div>
         </form>
@@ -102,6 +102,7 @@
         <div class="section-heading"><div><h2 id="inspector-title">Detalle de entidad</h2><p id="inspector-subtitle">Selecciona un predio o construcción</p></div><button id="inspector-close" class="icon-button" type="button" aria-label="Cerrar detalle">×</button></div>
         <div id="inspector-content" class="inspector-content"></div>
         <button id="inspector-zoom" class="secondary-action" type="button">Acercar a entidad</button>
+        <button id="inspector-cadastral-sheet" class="secondary-action" type="button" hidden>Generar ficha catastral</button>
         <button id="inspector-share" class="secondary-action" type="button">Copiar enlace de consulta</button>
         <p id="inspector-share-status" class="stats-note" aria-live="polite"></p>
       </section>
@@ -183,6 +184,10 @@
       <div class="map-topbar"><div class="location-pill"><span class="location-pulse"></span><span>MANRIQUE, MEDELLÍN</span><span class="location-divider"></span><span class="location-coords">6.28° N&nbsp; 75.56° O</span></div><div class="map-topbar-actions"><button class="map-badge legend-toggle" id="toggle-risk-legend" type="button" aria-label="Ocultar simbología" aria-expanded="true" title="Ocultar la simbología de capas de riesgo">◉ <span>OCULTAR SIMBOLOGÍA</span></button><button class="map-badge legend-toggle uva-marker-toggle" id="toggle-uva-marker" type="button" aria-label="Ocultar marcador UVA La Armonía" aria-expanded="true" title="Ocultar marcador UVA La Armonía">⌖ <span>OCULTAR UVA</span></button><a class="map-badge preview-3d-link" href="vista-3d.html" title="Abrir vista 3D">◈ <span>VISTA 3D</span></a><a class="map-badge preview-3d-link dashboard-link" href="dashboard.html" title="Abrir el dashboard de análisis territorial">▥ <span>DASHBOARD</span></a></div></div>
       <div class="map-status"><div class="coordinate-readout"><span class="status-label">COORDENADAS · EPSG:4326</span><strong id="coordinates">Mueve el cursor sobre el mapa</strong><small id="crs-indicator">Mapa EPSG:3857 · Datos fuente EPSG:9377</small></div><div class="status-divider"></div><div class="zoom-readout"><span class="status-label">NIVEL DE ZOOM</span><strong id="zoom-level">—</strong></div></div>
     </section>
+    <dialog id="cadastral-sheet-dialog" class="cadastral-sheet-dialog" aria-labelledby="cadastral-sheet-title">
+      <header class="cadastral-sheet-toolbar"><strong>Ficha Catastral Simplificada</strong><div><button id="cadastral-sheet-print" type="button" class="secondary-action">Imprimir / Guardar PDF</button><button id="cadastral-sheet-close" type="button" class="icon-button" aria-label="Cerrar ficha">×</button></div></header>
+      <article id="cadastral-sheet-content" class="cadastral-sheet-content"></article>
+    </dialog>
     <dialog id="csv-import-dialog" class="metadata-dialog"><form id="csv-import-form" method="dialog"><button class="dialog-close" value="cancel" aria-label="Cerrar">×</button><h2>Importar CSV de coordenadas</h2><p>Elige las columnas X/Y y el CRS de origen. Las coordenadas se transformarán a WGS 84 para mostrarlas.</p><label class="filter-field">Columna X / longitud<select id="csv-x-column" required></select></label><label class="filter-field">Columna Y / latitud<select id="csv-y-column" required></select></label><label class="filter-field">Sistema de coordenadas<select id="csv-crs"><option value="4326">EPSG:4326 · WGS 84</option><option value="3116">EPSG:3116 · MAGNA-SIRGAS / Bogotá</option><option value="9377">EPSG:9377 · MAGNA-SIRGAS 2018 / Origen-Nacional</option></select></label><div class="csv-import-actions"><button value="cancel" type="submit">Cancelar</button><button id="csv-import-confirm" value="import" type="submit">Importar puntos</button></div></form></dialog>
     <dialog id="onboarding-dialog" class="onboarding-dialog" aria-labelledby="onboarding-title" aria-describedby="onboarding-description">
       <button class="dialog-close onboarding-close" id="onboarding-close" type="button" aria-label="Cerrar instructivo">&times;</button>
@@ -205,7 +210,7 @@
     <script src="https://unpkg.com/shpjs@6.2.0/dist/shp.js"></script>
     <script src="https://unpkg.com/georaster@1.6.0/dist/georaster.browser.bundle.min.js"></script>
     <script src="https://unpkg.com/georaster-layer-for-leaflet@3.10.0/dist/georaster-layer-for-leaflet.min.js"></script>
-    <script src="scripts.js?v=uva-marker-1"></script>
+    <script src="scripts.js?v=cadastral-sheet-1"></script>
 
 </body>
 </html>
