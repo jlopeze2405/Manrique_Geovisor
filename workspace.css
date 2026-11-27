@@ -72,3 +72,5 @@
 .onboarding-start{width:100%;margin-top:20px;padding:12px;border-radius:9px;font-size:12px}
 @keyframes onboarding-appear{from{opacity:0;transform:translateY(7px) scale(.99)}to{opacity:1;transform:translateY(0) scale(1)}}
 @media(max-width:480px){.onboarding-dialog{padding:26px 20px}.onboarding-dialog h2{font-size:22px}}
+.dashboard-link{border-color:#0f718066!important;background:#e8f3f5!important;color:#0b6370!important}.dashboard-link:hover{border-color:#0f7180!important;background:#d8ecef!important}
+@media(max-width:620px){.dashboard-link{padding:8px 9px!important;font-size:9px!important}.dashboard-link span{display:none!important}}

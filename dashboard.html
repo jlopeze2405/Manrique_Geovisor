@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#edf2f5">
+  <title>Dashboard territorial · GEOMANRIQUE</title>
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <div class="dashboard-shell">
+    <header class="dashboard-header">
+      <a class="brand-lockup" href="index.html" aria-label="Volver al geovisor GEOMANRIQUE"><img src="Images/Colmayor_escudo.png" alt=""><span><small>GEOMANRIQUE</small><strong>ANÁLISIS TERRITORIAL</strong></span></a>
+      <div class="header-context"><span class="live-dot"></span><span>Cuatro barrios · Comuna 3 · Medellín</span></div>
+      <div class="header-actions"><a class="header-button secondary" href="index.html">← Geovisor</a><button class="header-button secondary" id="fullscreen-button" type="button">Pantalla completa</button><button class="header-button" id="reset-filters" type="button">Restablecer</button></div>
+    </header>
+
+    <main class="dashboard-main">
+      <section class="dashboard-title-row"><div><p class="eyebrow">INTELIGENCIA GEOESPACIAL</p><h1>Dashboard de análisis territorial</h1><p class="subtitle">Explora cómo se distribuyen el riesgo, la amenaza, los predios y las construcciones.</p></div><p class="data-stamp" id="data-stamp">Cargando fuentes…</p></section>
+
+      <section class="filter-panel" aria-labelledby="filters-title">
+        <div class="filter-heading"><div><h2 id="filters-title">Filtros</h2><p>Los indicadores, gráficos, mapa y tabla responden a la selección.</p></div><button id="clear-filters" class="text-button" type="button">Limpiar filtros</button></div>
+        <div class="filters-grid">
+          <label class="select-filter">Barrio<select id="neighborhood-filter"><option value="all">Los cuatro barrios</option></select></label>
+          <div class="multi-filter" data-filter="risk"><span class="filter-label">Categoría de riesgo</span><details><summary id="risk-summary">Todas</summary><div class="filter-options" id="risk-options"></div></details></div>
+          <div class="multi-filter" data-filter="threat"><span class="filter-label">Categoría de amenaza</span><details><summary id="threat-summary">Todas</summary><div class="filter-options" id="threat-options"></div></details></div>
+          <div class="multi-filter" data-filter="property-type"><span class="filter-label">Tipo de predio</span><details><summary id="property-type-summary">Todos</summary><div class="filter-options" id="property-type-options"></div></details></div>
+          <div class="multi-filter" data-filter="land-use"><span class="filter-label">Destinación predial</span><details><summary id="land-use-summary">Todas</summary><div class="filter-options" id="land-use-options"></div></details></div>
+          <div class="multi-filter" data-filter="floors"><span class="filter-label">Número de pisos</span><details><summary id="floors-summary">Todos</summary><div class="filter-options compact" id="floors-options"></div></details></div>
+          <label class="search-filter">Buscar identificador<input id="global-search" type="search" placeholder="Número predial, CBML o ID de construcción"></label>
+        </div>
+        <div class="filter-chips" id="active-filters" aria-live="polite"></div>
+      </section>
+
+      <section class="kpi-grid" aria-label="Indicadores principales">
+        <article class="kpi-card"><span class="kpi-icon parcels">P</span><div><p>Predios en el filtro</p><strong id="kpi-parcels">—</strong><small id="kpi-parcels-note">Geometrías únicas</small></div></article>
+        <article class="kpi-card"><span class="kpi-icon buildings">C</span><div><p>Construcciones en el filtro</p><strong id="kpi-buildings">—</strong><small id="kpi-buildings-note">Geometrías únicas</small></div></article>
+        <article class="kpi-card"><span class="kpi-icon area">m²</span><div><p>Área geométrica predial</p><strong id="kpi-parcel-area">—</strong><small>m² · suma del campo Shape_Area</small></div></article>
+        <article class="kpi-card"><span class="kpi-icon footprint">m²</span><div><p>Área geométrica construida</p><strong id="kpi-building-area">—</strong><small>m² · huella de las construcciones</small></div></article>
+        <article class="kpi-card"><span class="kpi-icon floors">↕</span><div><p>Pisos promedio</p><strong id="kpi-avg-floors">—</strong><small id="kpi-height-note">La fuente no contiene altura en metros.</small></div></article>
+      </section>
+      <p class="summary-reading" id="summary-reading" aria-live="polite"></p>
+      <p class="print-filter-summary" id="print-filter-summary"></p>
+
+      <section class="analysis-grid">
+        <article class="panel map-panel"><div class="panel-heading"><div><p class="panel-kicker">RESUMEN ESPACIAL</p><h2>Distribución por barrio</h2><p class="panel-description">Selecciona una temática. Pulsa un barrio para filtrar el dashboard.</p></div><label class="map-theme-label">Variable<select id="map-theme"><option value="parcel-count">Cantidad de predios</option><option value="building-count">Cantidad de construcciones</option><option value="parcel-area">Área predial (m²)</option><option value="building-area">Área construida (m²)</option><option value="parcel-risk">Predios con riesgo alto</option><option value="building-risk">Construcciones con riesgo alto</option><option value="parcel-threat">Predios con amenaza alta</option><option value="building-threat">Construcciones con amenaza alta</option></select></label></div><div id="dashboard-map" role="region" aria-label="Mapa temático de barrios"></div><div class="map-legend"><span><i class="legend-low"></i> Menor</span><span><i class="legend-mid"></i> Intermedio</span><span><i class="legend-high"></i> Mayor</span><small>El color compara barrios; el dato del mapa se calcula con los registros filtrados.</small></div><p class="map-note">Los registros se asignan a un barrio por su punto representativo. El color resume cantidades o áreas; no representa una intersección predial calculada con zonas oficiales.</p></article>
+        <article class="panel chart-panel"><div class="panel-heading"><div><p class="panel-kicker">VARIABLES DE RIESGO</p><h2>Riesgo registrado</h2><p class="panel-description">Toca una categoría para filtrar; predios y construcciones se comparan por separado.</p></div></div><div id="risk-chart" class="chart" role="img" aria-label="Gráfico comparativo de registros por categoría de riesgo"></div><div class="chart-footnote">Frecuencia según el atributo de riesgo de cada capa.</div></article>
+        <article class="panel chart-panel"><div class="panel-heading"><div><p class="panel-kicker">VARIABLES DE AMENAZA</p><h2>Amenaza registrada</h2><p class="panel-description">La amenaza se mantiene separada de la clasificación de riesgo.</p></div></div><div id="threat-chart" class="chart" role="img" aria-label="Gráfico comparativo de registros por categoría de amenaza"></div><div class="chart-footnote">Frecuencia según el atributo de categoría de cada capa.</div></article>
+        <article class="panel chart-panel"><div class="panel-heading"><div><p class="panel-kicker">CARACTERIZACIÓN PREDIAL</p><h2>Destinación de los predios</h2><p class="panel-description">Selecciona una porción para filtrar los predios.</p></div></div><div id="landuse-chart" class="chart" role="img" aria-label="Gráfico de destinación predial"></div><div class="stats-inline" id="parcel-area-summary"></div></article>
+        <article class="panel chart-panel"><div class="panel-heading"><div><p class="panel-kicker">TENENCIA CATASTRAL</p><h2>Tipo de predio</h2><p class="panel-description">Clasificación registrada en la capa predial.</p></div></div><div id="type-chart" class="chart" role="img" aria-label="Gráfico de tipos de predio"></div></article>
+        <article class="panel chart-panel"><div class="panel-heading"><div><p class="panel-kicker">CARACTERIZACIÓN CONSTRUCTIVA</p><h2>Número de pisos</h2><p class="panel-description">Distribución registrada en la capa de construcciones.</p></div></div><div id="floors-chart" class="chart" role="img" aria-label="Gráfico de construcciones por número de pisos"></div></article>
+      </section>
+
+      <section class="panel records-panel"><div class="panel-heading records-heading"><div><p class="panel-kicker">REGISTROS QUE RESPALDAN LOS INDICADORES</p><h2>Tabla de consulta</h2><p class="panel-description">Solo muestra atributos catastrales y físicos necesarios para el análisis.</p></div><div class="export-actions"><button class="header-button secondary" id="export-csv" type="button">Descargar CSV</button><button class="header-button secondary" id="export-xlsx" type="button">Descargar Excel</button><button class="header-button secondary" id="export-pdf" type="button">Imprimir / PDF</button></div></div>
+        <div class="table-toolbar"><div class="record-tabs" role="tablist" aria-label="Tipo de registros"><button class="record-tab active" type="button" role="tab" aria-selected="true" data-record-tab="parcels">Predios <span id="table-parcel-count">—</span></button><button class="record-tab" type="button" role="tab" aria-selected="false" data-record-tab="buildings">Construcciones <span id="table-building-count">—</span></button></div><label>Buscar en la tabla<input id="table-search" type="search" placeholder="Filtrar registros visibles"></label></div>
+        <div class="table-scroll"><table><thead id="records-head"></thead><tbody id="records-body"><tr><td class="empty-cell">Cargando las capas del estudio…</td></tr></tbody></table></div>
+        <footer class="table-footer"><span id="table-status">Cargando información segura para análisis…</span><div><button id="table-prev" type="button" aria-label="Página anterior" disabled>←</button><span id="table-page">0 de 0</span><button id="table-next" type="button" aria-label="Página siguiente" disabled>→</button></div></footer>
+      </section>
+      <p class="method-note"><strong>Alcance y fuente.</strong> Se resumen los atributos ya registrados en las capas de los cuatro barrios. Los campos de nombres y documentos de titulares se excluyen del módulo y de sus exportaciones. Las áreas corresponden a la geometría en EPSG:9377 (metros); no se interpreta el campo de altura porque la capa no lo contiene. Las geometrías repetidas exactas se cuentan una sola vez; los conflictos entre sus atributos quedan sin clasificar.</p>
+      <p class="data-quality-note" id="dedupe-note" aria-live="polite"></p>
+    </main>
+    <div id="loading-overlay" class="loading-overlay"><div class="loader-card"><span class="loader-mark">G</span><h2>Preparando el análisis</h2><p id="loading-status">Leyendo los barrios de estudio y sus registros…</p><div class="loader-track"><i></i></div></div></div>
+    <div id="dashboard-error" class="dashboard-error" role="alert" hidden></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://unpkg.com/proj4@2.22.0/dist/proj4.js"></script>
+  <script src="https://unpkg.com/shpjs@6.2.0/dist/shp.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.6.0/dist/echarts.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="dashboard.js?v=territorial-analysis-1"></script>
+</body>
+</html>
