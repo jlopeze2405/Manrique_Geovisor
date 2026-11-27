@@ -623,9 +623,10 @@
   async function loadDashboard() {
     if (!window.L || !window.shp || !window.echarts) throw new Error('Falta una biblioteca de mapas, gráficos o lectura de shapefiles. Revisa tu conexión a internet y recarga.');
     setLoading('Leyendo la geometría de los cuatro barrios…');
+    var barriosUrl = new URL('data/BARRIOS_INFLUENCIA/Barrios', document.baseURI).href;
     var tasks = [
       fetch('data/dashboard_attributes.json').then(function (response) { if (!response.ok) throw new Error('No se encontró el paquete seguro de atributos del dashboard.'); return response.json(); }),
-      window.shp('data/BARRIOS_INFLUENCIA/Barrios'),
+      window.shp(barriosUrl),
       loadGeometryOnly('data/Predios_Barrios_Estudio/Predios_Estudio', 'predios'),
       loadGeometryOnly('data/Construcciones_Barrios_Estudio/Construcciones', 'construcciones')
     ];
