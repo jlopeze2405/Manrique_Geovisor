@@ -54,6 +54,8 @@
   map.createPane('diagnosticPane');
   map.getPane('diagnosticPane').style.zIndex = 615;
   map.getPane('diagnosticPane').style.pointerEvents = 'none';
+  map.createPane('landmarkPane');
+  map.getPane('landmarkPane').style.zIndex = 640;
   map.createPane('printGridPane');
   map.getPane('printGridPane').style.zIndex = 625;
   map.createPane('printGridLabelPane');
@@ -585,6 +587,26 @@
   addLayerControl('Ortofoto Medellín 2025 (carga optimizada)', ortofotoMedellin, '#2f855a', true, true);
   baseLayers.forEach(function (baseLayer) { if (baseLayer !== ortofotoMedellin && map.hasLayer(baseLayer)) map.removeLayer(baseLayer); });
   ortofotoMedellin.addTo(map);
+
+  var uvaIcon = L.divIcon({
+    className: 'uva-div-icon',
+    html: '<span class="uva-marker-shell" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M4 17.5h16M6.5 17.5V9l5.5-4 5.5 4v8.5M9.5 17.5v-4h5v4M8.5 9.5h.01M12 8h.01M15.5 9.5h.01" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>',
+    iconSize: [40, 44], iconAnchor: [20, 40], tooltipAnchor: [17, -28], popupAnchor: [0, -38]
+  });
+  var uvaMarker = L.marker([6.27452, -75.54542], { pane: 'landmarkPane', icon: uvaIcon, title: 'UVA La Armonía', alt: 'UVA La Armonía, Santa Inés' }).addTo(map);
+  uvaMarker.bindTooltip('UVA La Armonía', { permanent: true, direction: 'right', offset: [10, -15], className: 'uva-label', opacity: 1 });
+  var uvaPopup = document.createElement('article');
+  uvaPopup.className = 'uva-popup';
+  var uvaPopupPhoto = document.createElement('img');
+  uvaPopupPhoto.className = 'uva-popup-photo';
+  uvaPopupPhoto.src = 'Images/Uva_Armon%C3%ADa.jpg';
+  uvaPopupPhoto.alt = 'Vista de la UVA La Armonía y el barrio de ladera';
+  var uvaPopupTitle = document.createElement('strong');
+  uvaPopupTitle.textContent = 'UVA La Armonía';
+  var uvaPopupAddress = document.createElement('span');
+  uvaPopupAddress.textContent = 'Carrera 36 # 84-98 · Santa Inés, Manrique';
+  uvaPopup.append(uvaPopupPhoto, uvaPopupTitle, uvaPopupAddress);
+  uvaMarker.bindPopup(uvaPopup, { className: 'uva-popup-container', maxWidth: 320 });
 
   var attributeFeatures = [];
   var attributeSourceFeatures = [];
@@ -2361,6 +2383,16 @@
     riskLegendToggle.title = riskLegendUserHidden ? 'Mostrar la simbología de capas de riesgo' : 'Ocultar la simbología de capas de riesgo';
     riskLegendToggle.setAttribute('aria-label', riskLegendUserHidden ? 'Mostrar simbología' : 'Ocultar simbología');
     riskLegendToggle.querySelector('span').textContent = riskLegendUserHidden ? 'MOSTRAR SIMBOLOGÍA' : 'OCULTAR SIMBOLOGÍA';
+  });
+  var uvaMarkerToggle = document.getElementById('toggle-uva-marker');
+  var uvaMarkerHidden = false;
+  uvaMarkerToggle.addEventListener('click', function () {
+    uvaMarkerHidden = !uvaMarkerHidden;
+    if (uvaMarkerHidden) map.removeLayer(uvaMarker); else uvaMarker.addTo(map);
+    uvaMarkerToggle.setAttribute('aria-expanded', String(!uvaMarkerHidden));
+    uvaMarkerToggle.textContent = (uvaMarkerHidden ? '⌖ MOSTRAR UVA' : '⌖ OCULTAR UVA');
+    uvaMarkerToggle.title = uvaMarkerHidden ? 'Mostrar marcador UVA La Armonía' : 'Ocultar marcador UVA La Armonía';
+    uvaMarkerToggle.setAttribute('aria-label', uvaMarkerToggle.title);
   });
   function updatePrintComposition() {
     var rail = document.querySelector('.print-rail');
