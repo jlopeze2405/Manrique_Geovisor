@@ -134,6 +134,7 @@
   var layerGroupTabList = null;
   var layerGroupPanelList = null;
   var entityFilter = document.getElementById('entity-filter');
+  var addressFilter = document.getElementById('address-filter');
   var spatialSelection = [];
   var spatialQueryActive = false;
   var lastSpatialQueryGeometry = null;
@@ -168,6 +169,36 @@
       activateWorkspaceTab(tabs[next].dataset.workspaceTab, true);
     });
   });
+
+  var sidebarResizeHandle = document.getElementById('sidebar-resize-handle');
+  if (sidebarResizeHandle) {
+    var appShell = document.querySelector('.app-shell');
+    var sidebarWidth = 340;
+    try { sidebarWidth = Number(localStorage.getItem('geomanrique-sidebar-width')) || sidebarWidth; } catch (error) {}
+    var setSidebarWidth = function (width) {
+      var max = Math.min(560, window.innerWidth - 260);
+      sidebarWidth = Math.max(280, Math.min(max, Math.round(width)));
+      appShell.style.setProperty('--sidebar-width', sidebarWidth + 'px');
+      sidebarResizeHandle.setAttribute('aria-valuenow', String(sidebarWidth));
+      try { localStorage.setItem('geomanrique-sidebar-width', String(sidebarWidth)); } catch (error) {}
+      if (map) window.requestAnimationFrame(function () { map.invalidateSize({ animate: false }); });
+    };
+    setSidebarWidth(sidebarWidth);
+    sidebarResizeHandle.addEventListener('pointerdown', function (event) {
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      sidebarResizeHandle.setPointerCapture(event.pointerId);
+      setSidebarWidth(event.clientX);
+      event.preventDefault();
+    });
+    sidebarResizeHandle.addEventListener('pointermove', function (event) {
+      if (sidebarResizeHandle.hasPointerCapture(event.pointerId)) setSidebarWidth(event.clientX);
+    });
+    sidebarResizeHandle.addEventListener('keydown', function (event) {
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+      event.preventDefault(); setSidebarWidth(sidebarWidth + (event.key === 'ArrowRight' ? 20 : -20));
+    });
+    window.addEventListener('resize', function () { setSidebarWidth(sidebarWidth); });
+  }
 
   function showLayerMetadata(name, path, group) {
     if (!metadataDialog) {
@@ -1317,6 +1348,11 @@
       var ids = ['numero_pre', 'matricula_'];
       if (!ids.some(function (field) { var value = propertyValue(p, [field]); return value !== '' && normalizedText(value).indexOf(query) !== -1; })) return false;
     }
+    var addressQuery = addressFilter ? normalizedText(addressFilter.value.trim()) : '';
+    if (addressQuery) {
+      var address = propertyValue(feature.properties || {}, ['direccion', 'nomenclatura', 'dir_predio', 'direccion_', 'dir_pred', 'direccion_predio']);
+      if (!address || normalizedText(address).indexOf(addressQuery) === -1) return false;
+    }
     return true;
   }
 
@@ -1327,12 +1363,16 @@
   function applyDataFilters() {
     var filtersActive = (neighborhoodFilter && neighborhoodFilter.value !== 'all') ||
       (riskFilter && riskFilter.value !== 'all') || (landuseFilter && landuseFilter.value !== 'all') ||
-      (entityFilter && entityFilter.value.trim());
-    if (filtersActive) parcelFilterFeatures.concat(constructionFilterFeatures).forEach(function (feature) {
+      (entityFilter && entityFilter.value.trim()) || (addressFilter && addressFilter.value.trim());
+    var resetFilters = !filtersActive && applyDataFilters._wasActive;
+    if (filtersActive || resetFilters) parcelFilterFeatures.concat(constructionFilterFeatures).forEach(function (feature) {
       var visible = passesDataFilters(feature), layer = feature._leafletLayer;
       if (!layer || typeof layer.setStyle !== 'function') return;
-      layer.setStyle({ opacity: visible ? 0.95 : 0, fillOpacity: visible ? (layer._isParcelLayer ? 0.07 : 0.18) : 0 });
+      var style = layer._resolveFeatureStyle ? layer._resolveFeatureStyle() : Object.assign({}, layer._originalFeatureStyle || {});
+      if (filtersActive) { style.opacity = visible ? (style.opacity == null ? 0.95 : style.opacity) : 0; if (!visible) style.fillOpacity = 0; }
+      layer.setStyle(style);
     });
+    applyDataFilters._wasActive = !!filtersActive;
     if (spatialQueryActive) {
       var visibleSpatial = spatialSelection.filter(function (item) { return passesDataFilters(item.feature); });
       visibleSpatial.forEach(function (item) {
@@ -1352,6 +1392,10 @@
     var statisticsRevision = (updateAreaStatistics._revision || 0) + 1;
     updateAreaStatistics._revision = statisticsRevision;
     var countNode = document.getElementById('parcel-count');
+    var addressStatus = document.getElementById('address-search-status');
+    if (addressStatus) addressStatus.textContent = addressFilter && addressFilter.value.trim()
+      ? parcels.length.toLocaleString('es') + ' predios y ' + buildings.length.toLocaleString('es') + ' construcciones coinciden con los filtros activos.'
+      : 'Busca por una parte de la direcciÃ³n o nomenclatura del predio.';
     var percentNode = document.getElementById('building-risk-percent');
     var scopeNode = document.getElementById('stats-scope');
     if (countNode) countNode.textContent = parcels.length.toLocaleString('es');
@@ -1377,6 +1421,7 @@
       if (selected !== 'all' && neighborhoodFilter) scopeParts.push('barrio: ' + neighborhoodFilter.options[neighborhoodFilter.selectedIndex].textContent);
       if (riskFilter && riskFilter.value !== 'all') scopeParts.push('riesgo: ' + riskFilter.options[riskFilter.selectedIndex].textContent);
       if (entityFilter && entityFilter.value.trim()) scopeParts.push('identificador: ' + entityFilter.value.trim());
+      if (addressFilter && addressFilter.value.trim()) scopeParts.push('direcciÃ³n: ' + addressFilter.value.trim());
       scopeNode.textContent = scopeParts.length ? 'Filtros activos · ' + scopeParts.join(' · ') : 'Área de estudio · sin filtros';
     }
     var distribution = document.getElementById('risk-distribution');
@@ -1439,6 +1484,7 @@
   if (riskFilter) riskFilter.addEventListener('change', applyDataFilters);
   if (neighborhoodFilter) neighborhoodFilter.addEventListener('change', applyDataFilters);
   if (entityFilter) entityFilter.addEventListener('input', applyDataFilters);
+  if (addressFilter) addressFilter.addEventListener('input', applyDataFilters);
 
   var buildingDiagnosticForm = document.getElementById('building-diagnostic-form');
   var buildingDiagnosticInput = document.getElementById('building-diagnostic-identifier');
@@ -1886,6 +1932,7 @@
             featureLayer.bindPopup(content);
           }
           featureLayer._originalFeatureStyle = Object.assign({}, featureLayer.options);
+          featureLayer._resolveFeatureStyle = function () { return layer.options.style ? layer.options.style(featureLayer.feature) : Object.assign({}, featureLayer._originalFeatureStyle); };
           if (!isParcelLayer && !isConstructionLayer) featureLayer.on('click', function (event) {
             if (activeAction || activeEdit) { if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent); return; }
             if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent);
@@ -2007,13 +2054,6 @@
     proj4.defs('EPSG:3116', '+proj=tmerc +lat_0=4.59620041666667 +lon_0=-74.0775079166667 +k=1 +x_0=1000000 +y_0=1000000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
     proj4.defs('EPSG:9377', '+proj=tmerc +lat_0=4 +lon_0=-73 +k=0.9992 +x_0=5000000 +y_0=2000000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
   }
-  loadGeoTiffOverlay('data/Raster/Pendiente/5metros_Slope.tif', 'Pendiente del terreno · 5 m', {
-    colorForValue: function (value) {
-      if (!Number.isFinite(value) || value < 0 || value > 90) return null;
-      return value < 15 ? '#2a9d62' : (value < 30 ? '#b6c84b' : (value < 45 ? '#f1a340' : '#c43c39'));
-    }
-  }, '#2a9d62', false, false);
-
   function normalizeFeatureCollections(value) {
     var values = Array.isArray(value) ? value : (value && value.type === 'FeatureCollection' ? [value] : (value && value.type === 'Feature' ? [{ type: 'FeatureCollection', features: [value] }] : Object.keys(value || {}).map(function (key) { return value[key]; })));
     return values.map(function (item) {

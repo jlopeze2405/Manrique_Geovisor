@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="workspace.css?v=cadastral-sheet-1">
+  <link rel="stylesheet" href="workspace.css?v=territorial-address-1">
 </head>
 <body>
   <main class="app-shell">
@@ -52,6 +52,10 @@
         <label class="filter-field">Identificador predial o construcción
           <input id="entity-filter" type="search" placeholder="Número predial o matrícula">
         </label>
+        <label class="filter-field">Dirección del predio
+          <input id="address-filter" type="search" placeholder="Ej. Calle 45 # 23-18" autocomplete="street-address">
+        </label>
+        <p id="address-search-status" class="stats-note" aria-live="polite">Busca por una parte de la dirección o nomenclatura del predio.</p>
       </section>
       <section class="panel-section spatial-query-panel" aria-label="Consulta por área dibujada">
         <div class="section-heading"><span class="section-icon" aria-hidden="true">⌖</span><div><h2>Consulta por área</h2><p>Filtra entidades con un dibujo</p></div></div>
@@ -150,6 +154,8 @@
       <footer class="sidebar-footer"><span class="live-dot"></span> VISOR ACTIVO <span class="footer-version">SIG · 01</span></footer>
     </aside>
 
+    <button class="sidebar-resize-handle" id="sidebar-resize-handle" type="button" role="separator" aria-label="Ajustar ancho del panel lateral" aria-orientation="vertical" aria-valuemin="280" aria-valuemax="560" aria-valuenow="340" title="Arrastra para ajustar el ancho del panel"></button>
+
     <section class="map-stage" aria-label="Mapa interactivo">
       <div id="map"></div>
       <div class="print-heading"><strong>Evaluación espacial de riesgos</strong></div>
@@ -210,7 +216,7 @@
     <script src="https://unpkg.com/shpjs@6.2.0/dist/shp.js"></script>
     <script src="https://unpkg.com/georaster@1.6.0/dist/georaster.browser.bundle.min.js"></script>
     <script src="https://unpkg.com/georaster-layer-for-leaflet@3.10.0/dist/georaster-layer-for-leaflet.min.js"></script>
-    <script src="scripts.js?v=cadastral-sheet-1"></script>
+    <script src="scripts.js?v=territorial-address-1"></script>
 
 </body>
 </html>
