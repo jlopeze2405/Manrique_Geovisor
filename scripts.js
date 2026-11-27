@@ -108,7 +108,7 @@
     activeLayerLegend.textContent = '';
     var entries = Array.from(layerList.querySelectorAll('.layer-control-entry')).filter(function (entry) {
       var input = entry.querySelector('input');
-      return input && input.checked;
+      return input && input.checked && !(entry._mapLayer && entry._mapLayer._isCadastralLayer && !entry._mapLayer._showRiskSymbology);
     });
     if (!entries.length) {
       var empty = document.createElement('p'); empty.textContent = 'No hay capas visibles.'; activeLayerLegend.appendChild(empty); return;
@@ -867,7 +867,7 @@
     var shareButton = document.getElementById('inspector-share');
     if (shareButton) shareButton.hidden = !(isParcel || isConstruction);
     var sheetButton = document.getElementById('inspector-cadastral-sheet');
-    if (sheetButton) sheetButton.hidden = !isParcel;
+    if (sheetButton) { sheetButton.hidden = !isParcel; sheetButton._feature = isParcel ? feature : null; }
     selectedInspectorLayer = layer;
     panel.hidden = false;
   }
@@ -894,6 +894,11 @@
 
   function setSelectionToolActive(active) {
     selectionToolActive = !!active;
+    // The Canvas renderer checks every interactive cadastral path on pointer events.
+    // Keep those 32k paths out of hit testing until the user actually selects entities.
+    parcelFilterFeatures.concat(constructionFilterFeatures).forEach(function (feature) {
+      if (feature._leafletLayer) feature._leafletLayer.options.interactive = selectionToolActive;
+    });
     var button = document.getElementById('toggle-feature-selection');
     if (button) {
       button.setAttribute('aria-pressed', String(selectionToolActive));
@@ -1506,10 +1511,21 @@
       buildingDiagnosticInput.focus();
       return;
     }
-    if (!buildingDiagnosticFeaturesReady) {
-      buildingDiagnosticStatus.textContent = 'La capa de construcciones aún se está cargando. Intenta de nuevo en unos segundos.';
+    var parcelGroup = overlays['Predios de los barrios de estudio'];
+    var constructionGroup = overlays['Construcciones de los barrios de estudio'];
+    var diagnosticGroups = [parcelGroup, constructionGroup].filter(Boolean);
+    diagnosticGroups.forEach(function (group) {
+      if (group._startLoad) { group._startLoad(); group._startLoad = null; }
+    });
+    if (parcelGroup && !parcelGroup.featureData && parcelGroup._sourcePromise) {
+      buildingDiagnosticStatus.textContent = 'Cargando predios para completar la búsqueda…';
+      parcelGroup._sourcePromise.then(function () { buildingDiagnosticForm.requestSubmit(); })
+        .catch(function () { buildingDiagnosticStatus.textContent = 'No se pudieron cargar los predios para la búsqueda.'; });
       return;
     }
+    if (constructionGroup && !constructionGroup.featureData && constructionGroup._sourcePromise) constructionGroup._sourcePromise.then(function () {
+      if (normalizedText(buildingDiagnosticInput.value.trim()) === requestedIdentifier) buildingDiagnosticForm.requestSubmit();
+    }).catch(function () {});
     var matchingParcels = parcelFilterFeatures.filter(function (feature) {
       var properties = feature.properties || {};
       return ['numero_pre', 'matricula_'].some(function (field) {
@@ -1519,6 +1535,21 @@
     });
     if (!matchingParcels.length) {
       buildingDiagnosticStatus.textContent = 'No se encontró ningún predio con ese número catastral o matrícula.';
+      return;
+    }
+    matchingParcels.forEach(function (parcel, parcelMatchIndex) {
+      var properties = parcel.properties || {}, sourceIndex = parcelFilterFeatures.indexOf(parcel);
+      var card = document.createElement('article'); card.className = 'diagnostic-candidate diagnostic-parcel-candidate';
+      var title = document.createElement('h3'); title.textContent = 'Predio encontrado · ' + (buildingDiagnosticSourceValue(properties, ['numero_pre']) || 'Número predial N/A');
+      var detail = document.createElement('p');
+      detail.textContent = 'Matrícula: ' + (buildingDiagnosticSourceValue(properties, ['matricula_']) || 'N/A') + ' · Coincidencia ' + (parcelMatchIndex + 1) + ' · Registro ' + (sourceIndex + 1);
+      var makeSheet = document.createElement('button'); makeSheet.type = 'button'; makeSheet.textContent = 'Generar ficha';
+      makeSheet.setAttribute('aria-label', 'Generar ficha catastral del predio ' + (buildingDiagnosticSourceValue(properties, ['numero_pre', 'matricula_']) || (sourceIndex + 1)));
+      makeSheet.addEventListener('click', function () { generateCadastralSheet(parcel); });
+      card.append(title, detail, makeSheet); buildingDiagnosticCandidates.appendChild(card);
+    });
+    if (!buildingDiagnosticFeaturesReady) {
+      buildingDiagnosticStatus.textContent = 'Predio encontrado. Preparando la capa de construcciones; ya puedes generar la ficha catastral del predio.';
       return;
     }
     var matches = constructionFilterFeatures.filter(function (building) {
@@ -1601,7 +1632,7 @@
     riskLegendEntries.forEach(function (entry) {
       var zoom = map.getZoom();
       var withinScale = !entry.group._scaleMinZoom || (zoom >= entry.group._scaleMinZoom && zoom <= entry.group._scaleMaxZoom && entry.group.hasLayer(entry.group._scaleLimitedChild));
-      var visible = map.hasLayer(entry.group) && withinScale;
+      var visible = map.hasLayer(entry.group) && withinScale && entry.group._riskLegendEnabled !== false;
       entry.element.hidden = !visible;
       if (visible) hasVisibleLegend = true;
     });
@@ -1609,6 +1640,8 @@
   }
 
   function addRiskLegend(name, kind, group, constructionRiskLayer) {
+    if (group._riskLegendCreated) return;
+    group._riskLegendCreated = true;
     var items = kind === 'flood' ? [
       ['Alto no mitigable', '#b42332', 'dashed'], ['Alto mitigable', '#e87516'], ['Con condiciones', '#d6a41d']
     ] : kind === 'threat' ? [
@@ -1765,6 +1798,7 @@
         group._startLoad(); group._startLoad = null;
       }
     });
+    group._sourcePromise = source;
     source.then(function (geojson) {
       var collections = Array.isArray(geojson) ? geojson :
         (geojson && geojson.type === 'FeatureCollection' ? [geojson] : Object.keys(geojson || {}).map(function (key) { return geojson[key]; }));
@@ -1776,8 +1810,12 @@
       var isBoundary = path.indexOf('BARRIOS_INFLUENCIA') !== -1;
       var isParcelLayer = /Predios_Barrios_Estudio[\\/]Predios_Estudio/i.test(path);
       var isConstructionLayer = /Construcciones_Barrios_Estudio[\\/]Construcciones/i.test(path);
-      var riskKind = path.indexOf('Amenaza_Mov_Masa') !== -1 ? 'threat' : (/RIESGO_MOV_MASA|Construcciones_Barrios_Estudio/i.test(path) ? 'landslide' : null);
+      var riskKind = path.indexOf('Amenaza_Mov_Masa') !== -1 ? 'threat' : (/RIESGO_MOV_MASA|Construcciones_Barrios_Estudio|Predios_Barrios_Estudio/i.test(path) ? 'landslide' : null);
       var isRiskZoneLayer = riskKind && !isParcelLayer && !isConstructionLayer;
+      var isCadastralLayer = isParcelLayer || isConstructionLayer;
+      group._riskLegendEnabled = !isCadastralLayer;
+      group._showRiskSymbology = false;
+      group._isCadastralLayer = isCadastralLayer;
       var featurePane = isRiskZoneLayer ? 'riskPane' : (isParcelLayer ? 'parcelPane' : (isConstructionLayer ? 'constructionPane' : undefined));
       var renderFeatures = features;
       if (isBoundary) {
@@ -1798,27 +1836,30 @@
       features.forEach(function (feature) { feature._entityKind = isParcelLayer ? 'parcel' : (isConstructionLayer ? 'building' : ''); });
       // Thousands of cadastral polygons overwhelm SVG DOM rendering; Canvas keeps the
       // large Manrique layers interactive without creating one DOM node per feature.
-      var layerRenderer = isParcelLayer || isConstructionLayer ? L.canvas({ pane: featurePane || 'overlayPane', padding: 0.5 }) : undefined;
+      var layerRenderer = isParcelLayer || isConstructionLayer ? L.canvas({ pane: featurePane || 'overlayPane', padding: 0.15 }) : undefined;
       var layer = L.geoJSON({ type: 'FeatureCollection', features: renderFeatures }, {
         renderer: layerRenderer,
+        // Canvas already clips to the viewport; stronger screen-space simplification
+        // reduces redraw cost for the detailed cadastral boundaries during navigation.
+        smoothFactor: isParcelLayer || isConstructionLayer ? 2.5 : 1,
         bubblingMouseEvents: true,
         style: function (feature) {
-          var appearance = riskKind ? riskAppearance(feature && feature.properties, riskKind) : {};
-          var featureColor = riskKind ? appearance.color : color;
+          var appearance = riskKind && (!isCadastralLayer || group._showRiskSymbology) ? riskAppearance(feature && feature.properties, riskKind) : {};
+          var featureColor = isCadastralLayer && !group._showRiskSymbology ? '#8b9299' : (riskKind ? appearance.color : color);
           return {
             pane: featurePane,
             color: isBoundary ? '#ff35d3' : featureColor,
-            weight: isBoundary ? 3.5 : (isRiskZoneLayer || isConstructionLayer ? appearance.weight : (isParcelLayer ? 1.15 : 1.5)),
+            weight: isBoundary ? 3.5 : (isRiskZoneLayer ? appearance.weight : (isConstructionLayer ? (appearance.weight || 0.75) : (isParcelLayer ? (appearance.weight || 0.8) : 1.5))),
             opacity: 0.95,
             fillColor: featureColor,
-            fillOpacity: isRiskZoneLayer ? appearance.fillOpacity : (isParcelLayer ? 0.08 : (isConstructionLayer ? Math.min(0.22, appearance.fillOpacity + 0.06) : 0)),
+            fillOpacity: isRiskZoneLayer ? appearance.fillOpacity : (isCadastralLayer && group._showRiskSymbology ? appearance.fillOpacity : 0),
             dashArray: appearance.dashArray,
             className: isBoundary ? 'boundary-feature' : undefined
           };
         },
         pointToLayer: function (feature, latlng) {
-          var pointStyle = riskKind ? riskAppearance(feature && feature.properties, riskKind) : {};
-          var pointColor = riskKind ? pointStyle.color : color;
+          var pointStyle = riskKind && (!isCadastralLayer || group._showRiskSymbology) ? riskAppearance(feature && feature.properties, riskKind) : {};
+          var pointColor = isCadastralLayer && !group._showRiskSymbology ? '#8b9299' : (riskKind ? pointStyle.color : color);
           return L.circleMarker(latlng, { pane: featurePane, radius: 5, color: pointColor, weight: pointStyle.weight || 1.5, dashArray: pointStyle.dashArray, fillColor: pointColor, fillOpacity: riskKind ? pointStyle.fillOpacity : 0 });
         },
         onEachFeature: function (feature, featureLayer) {
@@ -1828,6 +1869,7 @@
           featureLayer.options.bubblingMouseEvents = !(isParcelLayer || isConstructionLayer);
           featureLayer._isParcelLayer = isParcelLayer;
           featureLayer._isConstructionLayer = isConstructionLayer;
+          if (isParcelLayer || isConstructionLayer) featureLayer.options.interactive = selectionToolActive;
           featureLayer._featureLayerName = name;
           // Build popup DOM only for small thematic layers. Cadastral layers have
           // tens of thousands of features; their details are shown in the inspector.
@@ -1868,6 +1910,30 @@
           }
         }
       });
+      if (isCadastralLayer && row && !row.querySelector('.layer-symbology-toggle')) {
+        var symbologyButton = document.createElement('button');
+        symbologyButton.type = 'button';
+        symbologyButton.className = 'layer-symbology-toggle';
+        symbologyButton.textContent = 'Mostrar simbología';
+        symbologyButton.setAttribute('aria-pressed', 'false');
+        symbologyButton.addEventListener('click', function (event) {
+          event.preventDefault(); event.stopPropagation();
+          group._showRiskSymbology = !group._showRiskSymbology;
+          group._riskLegendEnabled = group._showRiskSymbology;
+          symbologyButton.textContent = group._showRiskSymbology ? 'Ocultar simbología' : 'Mostrar simbología';
+          symbologyButton.setAttribute('aria-pressed', String(group._showRiskSymbology));
+          if (group._showRiskSymbology) addRiskLegend(name, 'landslide', group, isConstructionLayer);
+          layer.eachLayer(function (child) {
+            var apply = function (featureLayer) {
+              if (featureLayer.feature && featureLayer.setStyle) featureLayer.setStyle(layer.options.style(featureLayer.feature));
+              else if (featureLayer.eachLayer) featureLayer.eachLayer(apply);
+            };
+            apply(child);
+          });
+          updateRiskLegendPanel(); renderActiveLayerLegend();
+        });
+        row.appendChild(symbologyButton);
+      }
       if (isParcelLayer || isConstructionLayer) layer.on('click', function (event) {
         if (activeAction || activeEdit) { if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent); return; }
         if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent);
@@ -1915,7 +1981,8 @@
           row.appendChild(tableButton);
         }
       }
-      if (riskKind) addRiskLegend(name, riskKind, group, isConstructionLayer);
+      if (riskKind && !isCadastralLayer) addRiskLegend(name, riskKind, group, false);
+      if (isCadastralLayer && group._showRiskSymbology) addRiskLegend(name, 'landslide', group, isConstructionLayer);
       updateFeatureLabels();
       if (row) row.querySelector('.layer-state').textContent = row.querySelector('input').checked ? 'ON' : 'OFF';
       if (isParcelLayer || isConstructionLayer) updateScaleLimitedLayers();
@@ -2678,18 +2745,15 @@
   document.getElementById('inspector-close').addEventListener('click', function () { document.getElementById('feature-inspector').hidden = true; });
   document.getElementById('inspector-zoom').addEventListener('click', function () { var bounds = getLayerBounds(selectedInspectorLayer); if (bounds) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 18 }); });
   document.getElementById('inspector-cadastral-sheet').addEventListener('click', function () {
-    if (selectedInspectorLayer && selectedInspectorLayer._isParcelLayer) generateCadastralSheet(selectedInspectorLayer.feature);
+    var feature = this._feature || (selectedInspectorLayer && selectedInspectorLayer._isParcelLayer ? selectedInspectorLayer.feature : null);
+    if (feature) generateCadastralSheet(feature);
   });
   document.getElementById('cadastral-sheet-close').addEventListener('click', function () { document.getElementById('cadastral-sheet-dialog').close(); });
   document.getElementById('cadastral-sheet-print').addEventListener('click', function () {
-    var printWindow = window.open('', '_blank');
-    if (!printWindow) { alert('El navegador bloqueó la ventana de impresión. Permite ventanas emergentes para imprimir la ficha.'); return; }
-    var content = document.getElementById('cadastral-sheet-content').outerHTML;
-    printWindow.document.open();
-    printWindow.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Ficha Catastral Simplificada</title><style>@page{size:A4;margin:14mm}*{box-sizing:border-box}body{font:10pt Arial,sans-serif;color:#173b4f;margin:0}h1{font-size:20pt;margin:0 0 4px}.cadastral-sheet-subtitle{color:#607687;font-size:9pt;margin:0 0 12px}.cadastral-sheet-section{break-inside:avoid;margin:10px 0;padding:9px;border:1px solid #cbd8df;border-radius:5px}.cadastral-sheet-section h2{font-size:12pt;margin:0 0 7px}.cadastral-sheet-grid{display:grid;grid-template-columns:1fr 1fr;grid-auto-flow:row;gap:3px 12px;margin:0}.cadastral-sheet-grid dt{font-weight:bold}.cadastral-sheet-grid dd{margin:0;overflow-wrap:anywhere}.cadastral-plan-section{break-before:page;break-inside:auto}.cadastral-plan-figure{margin:0}.cadastral-plan-figure svg{display:block;width:100%;max-height:135mm}.plan-segment-label{font:10px Arial;fill:#173b4f;paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round}.plan-vertex-label{font:bold 13px Arial;fill:#b42332;paint-order:stroke;stroke:#fff;stroke-width:3px}.plan-north{font:bold 18px Arial;fill:#173b4f}.plan-scale-label,.plan-crs-label{font:10px Arial;fill:#173b4f}.cadastral-coordinate-table{width:100%;border-collapse:collapse;font-size:8pt;margin-top:8px}.cadastral-coordinate-table th,.cadastral-coordinate-table td{border:1px solid #cbd8df;padding:4px;text-align:right}.cadastral-coordinate-table th:first-child,.cadastral-coordinate-table td:first-child{text-align:center}.cadastral-coordinate-table th{background:#eef4f6}.cadastral-coordinate-table tr{break-inside:avoid}.cadastral-sheet-note{font-size:8pt;color:#526979}.cadastral-sheet-section dd{font-size:9pt}figure figcaption{font-size:8pt;margin-top:4px}</style></head><body>' + content + '</body></html>');
-    printWindow.document.close();
-    window.setTimeout(function () { printWindow.focus(); printWindow.print(); }, 250);
+    document.body.classList.add('printing-cadastral-sheet');
+    window.print();
   });
+  window.addEventListener('afterprint', function () { document.body.classList.remove('printing-cadastral-sheet'); });
   document.getElementById('inspector-share').addEventListener('click', async function () {
     var feature = selectedInspectorLayer && selectedInspectorLayer.feature;
     if (!feature) { document.getElementById('inspector-share-status').textContent = 'Selecciona un predio o una construcción primero.'; return; }

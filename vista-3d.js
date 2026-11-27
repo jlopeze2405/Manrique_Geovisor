@@ -9,6 +9,8 @@ const CONFIG = Object.freeze({
   verticalScale: 1.0,
   demUrl: "data/Raster/DEM/DEM_5m.tif",
   worldFileUrl: "data/Raster/DEM/DEM_5m.tfw",
+  slopeUrl: "data/Raster/Pendiente/5metros_Slope.tif",
+  slopeWorldFileUrl: "data/Raster/Pendiente/5metros_Slope.tfw",
   buildingsUrl: "data/Construcciones_Barrios_Estudio/Construcciones.shp",
   buildingsIndexUrl: "data/Construcciones_Barrios_Estudio/Construcciones.shx",
   buildingsAttributesUrl: "data/Construcciones_Barrios_Estudio/Construcciones.dbf",
@@ -136,6 +138,24 @@ function threatSymbol(value) {
   return THREAT_SYMBOLS[3];
 }
 
+function setFeatureRiskColors(layer, featureMap, enabled) {
+  const neutral = new THREE.Color(0x8b9299);
+  layer.traverse(object => {
+    const ids = object.geometry && object.geometry.getAttribute("featureId");
+    const colors = object.geometry && object.geometry.getAttribute("color");
+    if (!ids || !colors) return;
+    const color = new THREE.Color();
+    for (let vertex = 0; vertex < ids.count; vertex++) {
+      const feature = featureMap.get(Math.round(ids.getX(vertex)));
+      const value = feature && (feature.riskCategory || feature.Cat_Riesgo || feature.cat_riesgo || feature.riesgo || feature.categoria);
+      color.set(enabled && feature ? riskSymbol(value).hex : neutral);
+      colors.setXYZ(vertex, color.r, color.g, color.b);
+    }
+    colors.needsUpdate = true;
+  });
+  requestSceneRender();
+}
+
 async function loadJson(url) {
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) throw new Error("No se pudo leer " + url + " (HTTP " + response.status + ").");
@@ -167,6 +187,91 @@ async function loadDem(url) {
   } catch (error) {
     throw new Error("El archivo llegó desde el servidor, pero geotiff.js no pudo interpretarlo: " + (error && error.message ? error.message : error));
   }
+}
+
+const SLOPE_CLASSES = Object.freeze([
+  { code: 1, label: "Ligeramente plano · 0–3 %", color: [0, 97, 40] },
+  { code: 2, label: "Ligeramente inclinado · >3–7 %", color: [85, 145, 0] },
+  { code: 3, label: "Moderadamente inclinado · >7–12 %", color: [164, 196, 0] },
+  { code: 4, label: "Fuertemente inclinado · >12–25 %", color: [0, 255, 197] },
+  { code: 5, label: "Moderadamente escarpado · >25–50 %", color: [255, 186, 0] },
+  { code: 6, label: "Escarpado · >50–75 %", color: [255, 0, 0] },
+  { code: 7, label: "Muy escarpado · >75 %", color: [0, 0, 0] }
+]);
+
+function rasterClassTexture(values, width, height) {
+  const canvas = document.createElement("canvas");
+  canvas.width = width; canvas.height = height;
+  const context = canvas.getContext("2d", { alpha: true });
+  if (!context) throw new Error("No se pudo crear la textura de pendientes.");
+  const image = context.createImageData(width, height);
+  for (let i = 0; i < values.length; i++) {
+    const code = Math.round(Number(values[i]));
+    const category = SLOPE_CLASSES[code - 1];
+    if (!category || category.code !== code) continue;
+    const at = i * 4;
+    image.data[at] = category.color[0]; image.data[at + 1] = category.color[1]; image.data[at + 2] = category.color[2];
+    image.data[at + 3] = 224;
+  }
+  context.putImageData(image, 0, 0);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.NearestFilter;
+  return texture;
+}
+
+function createHillshadeTexture(values, mask, width, height) {
+  const canvas = document.createElement("canvas");
+  canvas.width = width; canvas.height = height;
+  const context = canvas.getContext("2d", { alpha: true });
+  if (!context) throw new Error("No se pudo crear la textura de sombreado.");
+  const image = context.createImageData(width, height);
+  const azimuth = 315 * Math.PI / 180, altitude = 45 * Math.PI / 180;
+  const light = [Math.sin(azimuth) * Math.cos(altitude), Math.cos(azimuth) * Math.cos(altitude), Math.sin(altitude)];
+  for (let row = 1; row < height - 1; row++) for (let col = 1; col < width - 1; col++) {
+    const i = row * width + col;
+    if (mask[i] || mask[i - width - 1] || mask[i - width] || mask[i - width + 1] || mask[i - 1] || mask[i + 1] || mask[i + width - 1] || mask[i + width] || mask[i + width + 1]) continue;
+    const a = values[i - width - 1], b = values[i - width], c = values[i - width + 1];
+    const d = values[i - 1], f = values[i + 1];
+    const g = values[i + width - 1], h = values[i + width], k = values[i + width + 1];
+    const dzdx = (c + 2 * f + k - a - 2 * d - g) / 40;
+    const dzdy = (g + 2 * h + k - a - 2 * b - c) / 40;
+    const length = Math.hypot(dzdx, dzdy, 1);
+    // Raster rows increase southward, so the north-facing normal uses +dzdy.
+    const shade = Math.max(0, (-dzdx * light[0] + dzdy * light[1] + light[2]) / length);
+    const gray = Math.round(45 + shade * 210), at = i * 4;
+    image.data[at] = image.data[at + 1] = image.data[at + 2] = gray;
+    image.data[at + 3] = 112;
+  }
+  context.putImageData(image, 0, 0);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  return texture;
+}
+
+function makeDrapedRasterLayer(name, tileMeshes, extent, texture, renderOrder) {
+  const layer = new THREE.Group();
+  layer.name = name;
+  for (const source of tileMeshes) {
+    const geometry = source.geometry.clone();
+    const positions = geometry.getAttribute("position");
+    for (let i = 1; i < positions.array.length; i += 3) positions.array[i] += 0.4;
+    positions.needsUpdate = true;
+    geometry.computeBoundingSphere();
+    const map = texture.clone();
+    map.repeat.set((source.userData.bbox.xmax - source.userData.bbox.xmin) / (extent.xmax - extent.xmin), (source.userData.bbox.ymax - source.userData.bbox.ymin) / (extent.ymax - extent.ymin));
+    map.offset.set((source.userData.bbox.xmin - extent.xmin) / (extent.xmax - extent.xmin), (source.userData.bbox.ymin - extent.ymin) / (extent.ymax - extent.ymin));
+    map.needsUpdate = true;
+    const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ map, transparent: true, depthWrite: false, side: THREE.DoubleSide, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
+    mesh.renderOrder = renderOrder;
+    mesh.name = name + "_" + source.userData.filename;
+    layer.add(mesh);
+  }
+  layer.userData = { crs: "EPSG:9377", sourceResolutionMeters: 5, drawCalls: layer.children.length };
+  return layer;
 }
 
 // Reads only the three DBF fields needed for the explicitly authorized height estimate.
@@ -401,7 +506,7 @@ function pointInRing(point, ring) {
 }
 
 async function addBuildingFootprints(scene, source, values, mask, width, height, extent, originX, originNorth, baseElevation) {
-  const fillPositions = [], boundaryPositions = [], featureIds = [], skippedFeatures = [];
+  const fillPositions = [], boundaryPositions = [], featureIds = [], footprintColors = [], skippedFeatures = [];
   let polygonCount = 0, holeCount = 0, failedPolygons = 0;
   for (let featureIndex = 0; featureIndex < source.features.length; featureIndex++) {
     const feature = source.features[featureIndex];
@@ -434,6 +539,7 @@ async function addBuildingFootprints(scene, source, values, mask, width, height,
         const p = points[index], elevation = elevations[index];
         fillPositions.push(p.x - originX, (elevation - baseElevation) * CONFIG.verticalScale + 1.2, p.north - originNorth);
         featureIds.push(feature.id);
+        footprintColors.push(0.55, 0.57, 0.60);
       }
       for (const ring of flat) {
         for (let i = 0; i < ring.length; i++) {
@@ -454,15 +560,16 @@ async function addBuildingFootprints(scene, source, values, mask, width, height,
   const fillGeometry = new THREE.BufferGeometry();
   fillGeometry.setAttribute("position", new THREE.Float32BufferAttribute(fillPositions, 3));
   const idAttribute = new THREE.Float32BufferAttribute(featureIds, 1); idAttribute.setUsage(THREE.StaticDrawUsage);
-  fillGeometry.setAttribute("featureId", idAttribute); fillGeometry.computeVertexNormals();
-  const fill = new THREE.Mesh(fillGeometry, new THREE.MeshBasicMaterial({ color: 0xc87945, transparent: true, opacity: 0.42, side: THREE.DoubleSide, depthTest: true, depthWrite: false, toneMapped: false }));
+  fillGeometry.setAttribute("featureId", idAttribute);
+  fillGeometry.setAttribute("color", new THREE.Float32BufferAttribute(footprintColors, 3)); fillGeometry.computeVertexNormals();
+  const fill = new THREE.Mesh(fillGeometry, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.42, side: THREE.DoubleSide, depthTest: true, depthWrite: false, toneMapped: false }));
   fill.name = "building_footprints_fill"; fill.renderOrder = 3; fill.userData.featureIds = [...new Set(featureIds)]; layer.add(fill);
   const lineGeometry = new THREE.BufferGeometry();
   lineGeometry.setAttribute("position", new THREE.Float32BufferAttribute(boundaryPositions, 3));
-  const outlineMaterial = new THREE.LineBasicMaterial({ color: 0x5c321e, depthTest: true, toneMapped: false });
+  const outlineMaterial = new THREE.LineBasicMaterial({ color: 0x8b9299, depthTest: true, toneMapped: false });
   const outlines = new THREE.LineSegments(lineGeometry, outlineMaterial);
   outlines.name = "building_footprints_outlines"; outlines.renderOrder = 3; layer.add(outlines);
-  addWideLineSegments(layer, lineGeometry, { color: 0x5c321e, width: 2.5, renderOrder: 4 });
+  addWideLineSegments(layer, lineGeometry, { color: 0x8b9299, width: 2.5, renderOrder: 4 });
   layer.userData = { featureCount: source.features.length - skippedFeatures.length, sourceFeatureCount: source.recordCount, polygonCount, holeCount, failedPolygons, skippedFeatureIds: skippedFeatures, features: source.features, source: CONFIG.buildingsUrl, crs: "EPSG:9377", ids: [...new Set(featureIds)] };
   scene.add(layer);
   return layer;
@@ -556,7 +663,7 @@ function addPolygonOverlay(scene, source, categoryValues, kind, values, mask, wi
 }
 
 async function addParcelBoundaries(scene, source, values, mask, width, height, extent, originX, originNorth, baseElevation) {
-  const positions = [], featureIds = [], fillPositions = [], fillIds = [];
+  const positions = [], featureIds = [], lineColors = [], fillPositions = [], fillIds = [];
   let count = 0;
   const lineLift = 1.8;
   for (let featureIndex = 0; featureIndex < source.features.length; featureIndex++) {
@@ -576,6 +683,7 @@ async function addParcelBoundaries(scene, source, values, mask, width, height, e
         positions.push(p0.x - originX, (e0 - baseElevation) * CONFIG.verticalScale + lineLift, p0.north - originNorth,
           p1.x - originX, (e1 - baseElevation) * CONFIG.verticalScale + lineLift, p1.north - originNorth);
         featureIds.push(feature.id, feature.id);
+        lineColors.push(0.55, 0.57, 0.60, 0.55, 0.57, 0.60);
       }
     }
     const triangles = THREE.ShapeUtils.triangulateShape(part.shell.map(p => new THREE.Vector2(p.x, p.north)), part.holes.map(r => r.map(p => new THREE.Vector2(p.x, p.north))));
@@ -593,15 +701,16 @@ async function addParcelBoundaries(scene, source, values, mask, width, height, e
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute("featureId", new THREE.Float32BufferAttribute(featureIds, 1));
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(lineColors, 3));
   const fillGeometry = new THREE.BufferGeometry();
   fillGeometry.setAttribute("position", new THREE.Float32BufferAttribute(fillPositions, 3));
   fillGeometry.setAttribute("featureId", new THREE.Float32BufferAttribute(fillIds, 1));
   const layer = new THREE.Group(); layer.name = "parcel_boundaries_layer";
   const selectableFill = new THREE.Mesh(fillGeometry, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, colorWrite: false, depthWrite: false, side: THREE.DoubleSide }));
   selectableFill.name = "parcel_selection_surface"; layer.add(selectableFill);
-  const parcelLines = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: 0x00bcd4, transparent: true, opacity: 1, depthTest: true, depthWrite: false, toneMapped: false }));
+  const parcelLines = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: 0xffffff, vertexColors: true, transparent: true, opacity: 1, depthTest: true, depthWrite: false, toneMapped: false }));
   parcelLines.renderOrder = 4; layer.add(parcelLines);
-  addWideLineSegments(layer, geometry, { color: 0x00bcd4, width: 2.5, depthTest: true, renderOrder: 5 });
+  addWideLineSegments(layer, geometry, { color: 0xffffff, width: 2.5, depthTest: true, renderOrder: 5 });
   layer.userData = { featureCount: source.features.length, sourceRecordCount: source.recordCount, ringCount: count, features: source.features, source: CONFIG.parcelsUrl, crs: "EPSG:9377", attributesLoaded: true };
   scene.add(layer); return layer;
 }
@@ -1662,9 +1771,10 @@ function updatePrint3DComposition() {
 
   const riskVisible = document.getElementById("layer-risk").checked;
   const threatVisible = document.getElementById("layer-threat").checked;
+  const slopeVisible = document.getElementById("layer-slope").checked;
   const legend = document.getElementById("print-3d-legend");
   legend.replaceChildren();
-  if (riskVisible || threatVisible) {
+  if (riskVisible || threatVisible || slopeVisible) {
     const sourceItems = [...document.querySelectorAll(".legend-grid .legend-item")];
     const filteredItems = sourceItems.filter(item => {
       const label = item.textContent.toLocaleLowerCase("es");
@@ -1676,6 +1786,16 @@ function updatePrint3DComposition() {
     const grid = document.createElement("div");
     grid.className = "legend-grid";
     filteredItems.forEach(item => grid.appendChild(item.cloneNode(true)));
+    if (slopeVisible) {
+      document.querySelectorAll(".slope-legend p").forEach(item => {
+        const entry = document.createElement("span");
+        entry.className = "legend-item";
+        const swatch = item.querySelector("i").cloneNode();
+        const label = item.textContent;
+        entry.append(swatch, document.createTextNode(label));
+        grid.appendChild(entry);
+      });
+    }
     legend.appendChild(grid);
   } else {
     legend.textContent = "Activa zonificación de riesgo o amenaza para incluir sus clases.";
@@ -1726,10 +1846,12 @@ async function main() {
     throw new Error("La GPU admite texturas de hasta " + maxTextureSize + " px; se requieren al menos 1024 px.");
   }
   setStatus("Leyendo manifiesto y georreferencia del DEM…");
-  const [manifest, world, tiff, buildingSource, buildingAttributes, parcelSource, parcelAttributes, riskSource, riskAttributes, threatSource, threatAttributes, bufferSource] = await Promise.all([
+  const [manifest, world, tiff, slopeTiff, slopeWorld, buildingSource, buildingAttributes, parcelSource, parcelAttributes, riskSource, riskAttributes, threatSource, threatAttributes, bufferSource] = await Promise.all([
     loadJson(CONFIG.manifestUrl).catch(error => { throw new Error("Fallo al cargar el manifiesto de ortofotos: " + error.message); }),
     loadWorldFile(CONFIG.worldFileUrl).catch(error => { throw new Error("Fallo al cargar la georreferencia del DEM: " + error.message); }),
     loadDem(CONFIG.demUrl).catch(error => { throw new Error("Fallo al cargar el DEM " + CONFIG.demUrl + ": " + (error && error.message ? error.message : error)); }),
+    loadDem(CONFIG.slopeUrl).catch(error => { throw new Error("Fallo al cargar la clasificación de pendientes: " + (error && error.message ? error.message : error)); }),
+    loadWorldFile(CONFIG.slopeWorldFileUrl),
     Promise.resolve({ features: [], recordCount: 0 }),
     Promise.resolve({ records: [], recordCount: 0 }),
     Promise.resolve({ features: [], recordCount: 0 }),
@@ -1750,6 +1872,19 @@ async function main() {
   const height = image.getHeight();
   if (width < 100 || height < 100) throw new Error("El DEM de Manrique tiene dimensiones inesperadas: " + width + " × " + height + ".");
   const extent = getDemExtent(width, height, world);
+  const slopeImage = await slopeTiff.getImage();
+  const slopeWidth = slopeImage.getWidth(), slopeHeight = slopeImage.getHeight();
+  const slopeExtent = getDemExtent(slopeWidth, slopeHeight, slopeWorld);
+  const slopeCrs = slopeImage.getGeoKeys ? slopeImage.getGeoKeys().ProjectedCSTypeGeoKey : null;
+  if (slopeCrs !== 9377 || slopeWidth !== width || slopeHeight !== height ||
+      Math.abs(slopeExtent.xmin - extent.xmin) > 0.01 || Math.abs(slopeExtent.ymin - extent.ymin) > 0.01 ||
+      Math.abs(slopeExtent.xmax - extent.xmax) > 0.01 || Math.abs(slopeExtent.ymax - extent.ymax) > 0.01 ||
+      Math.abs(slopeExtent.pixelX - extent.pixelX) > 1e-6 || Math.abs(slopeExtent.pixelY - extent.pixelY) > 1e-6) {
+    throw new Error("El raster 5metros_Slope no coincide con la resolución, extensión o EPSG:9377 del DEM.");
+  }
+  const slopeBands = await slopeImage.readRasters({ interleave: false });
+  const slopeValues = slopeBands[0];
+  if (!slopeValues || slopeValues.length !== width * height) throw new Error("El raster de pendientes no contiene una banda válida.");
   const focusBounds = focusBoundsFromFeatures(bufferSource, CONFIG.focusMarginMeters, extent);
   const textureCoverage = validateManifest(manifest, extent);
   const geoKeys = image.getGeoKeys ? image.getGeoKeys() : {};
@@ -1780,6 +1915,7 @@ async function main() {
   ).sort((a, b) => a.row - b.row || a.column - b.column);
   if (!tiles.length) throw new Error("Ninguna tesela de ortofoto intersecta el entorno del área de estudio.");
   const textures = new Map();
+  const terrainTileMeshes = [];
   let loadedTextures = 0;
   for (const tile of tiles) {
     const texture = await loadTexture(textureLoader, tile);
@@ -1806,11 +1942,18 @@ async function main() {
     mesh.name = "terrain_" + tile.filename.replace(".jpg", "");
     mesh.userData = { filename: tile.filename, bbox: tile.bbox, row: tile.row, column: tile.column };
     terrainLayer.add(mesh);
+    terrainTileMeshes.push(mesh);
     materials.push(material);
   }
   const terrainSkirt = createTerrainSkirt(displaySurface.values, displaySurface.mask, width, height, extent, originX, originNorth, baseElevation, CONFIG.terrainSkirtDepthMeters, extent);
   terrainLayer.add(terrainSkirt);
   scene.add(terrainLayer);
+  const slopeTexture = rasterClassTexture(slopeValues, width, height);
+  const hillshadeTexture = createHillshadeTexture(elevations, analysis.mask, width, height);
+  const slopeLayer = makeDrapedRasterLayer("slope_classification_5m", terrainTileMeshes, extent, slopeTexture, 1.4);
+  const hillshadeLayer = makeDrapedRasterLayer("hillshade_5m", terrainTileMeshes, extent, hillshadeTexture, 1.5);
+  slopeTexture.dispose(); hillshadeTexture.dispose();
+  scene.add(slopeLayer, hillshadeLayer);
   const bufferLayer = addPolygonOverlay(scene, bufferSource, null, "buffer", elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
   const extrusionSample = null;
   const buildingLayer = new THREE.Group(); buildingLayer.name = "building_footprints_layer"; scene.add(buildingLayer);
@@ -1818,6 +1961,7 @@ async function main() {
   const parcelLayer = new THREE.Group(); parcelLayer.name = "parcel_boundaries_layer"; scene.add(parcelLayer);
   const buildingFeatures = new Map(), parcelFeatures = new Map();
   let buildingLoadPromise = null, parcelLoadPromise = null;
+  let constructionRiskSymbology = false, parcelRiskSymbology = false;
   const movePreparedLayer = (target, prepared) => {
     scene.remove(prepared);
     while (prepared.children.length) target.add(prepared.children[0]);
@@ -1843,6 +1987,7 @@ async function main() {
     await ensureBuildings();
     const prepared = await addBuildingFootprints(scene, buildingSource, elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
     movePreparedLayer(buildingLayer, prepared);
+    setFeatureRiskColors(buildingLayer, buildingFeatures, constructionRiskSymbology);
   };
   const buildVolumesOnDemand = async () => {
     await ensureBuildings();
@@ -1864,17 +2009,34 @@ async function main() {
     await parcelLoadPromise;
     const prepared = await addParcelBoundaries(scene, parcelSource, elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
     movePreparedLayer(parcelLayer, prepared);
+    setFeatureRiskColors(parcelLayer, parcelFeatures, parcelRiskSymbology);
   };
   const riskLayer = addPolygonOverlay(scene, riskSource, riskAttributes, "risk", elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
   const threatLayer = addPolygonOverlay(scene, threatSource, threatAttributes, "threat", elevations, analysis.mask, width, height, extent, originX, originNorth, baseElevation);
   const focusClipPlanes = applySceneFocusClip(scene, focusBounds, originX, originNorth, terrainLayer);
   enableLayerToggle("layer-terrain", terrainLayer);
+  enableLayerToggle("layer-slope", slopeLayer);
+  enableLayerToggle("layer-hillshade", hillshadeLayer);
   enableLayerToggle("layer-buffer", bufferLayer);
   enableLayerToggle("layer-buildings", buildingLayer, buildFootprintsOnDemand);
   enableLayerToggle("layer-building-volumes", estimatedBuildingLayer, buildVolumesOnDemand);
   enableLayerToggle("layer-parcels", parcelLayer, buildParcelsOnDemand);
   enableLayerToggle("layer-risk", riskLayer);
   enableLayerToggle("layer-threat", threatLayer);
+  const riskLegend = document.querySelector(".legend");
+  const connectSymbologyToggle = (buttonId, initial, setter, layer, features) => {
+    const button = document.getElementById(buttonId);
+    button.addEventListener("click", () => {
+      const enabled = button.getAttribute("aria-pressed") !== "true";
+      button.setAttribute("aria-pressed", String(enabled));
+      button.textContent = enabled ? "Ocultar simbología" : "Mostrar simbología";
+      setter(enabled);
+      if (riskLegend) riskLegend.open = constructionRiskSymbology || parcelRiskSymbology;
+      setFeatureRiskColors(layer, features, enabled);
+    });
+  };
+  connectSymbologyToggle("layer-buildings-symbology", constructionRiskSymbology, value => { constructionRiskSymbology = value; }, buildingLayer, buildingFeatures);
+  connectSymbologyToggle("layer-parcels-symbology", parcelRiskSymbology, value => { parcelRiskSymbology = value; }, parcelLayer, parcelFeatures);
   const selectionLayers = [
     { key: "buildings", layer: buildingLayer, source: "Construcciones_Barrios_Estudio", features: buildingFeatures, enabled: () => document.getElementById("layer-buildings").checked },
     { key: "volumes", layer: estimatedBuildingLayer, source: "Construcciones_Barrios_Estudio", features: buildingFeatures, enabled: () => document.getElementById("layer-building-volumes").checked },

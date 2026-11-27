@@ -4,9 +4,12 @@
 .workspace-tab:hover{background:#ffffffa8;color:#173b4f}
 .workspace-tab.active{border-color:#b9d3dc;background:#fff;color:#0b5363;box-shadow:0 2px 8px #0b2e5910}
 .workspace-tab:focus-visible{outline:2px solid #0f7180;outline-offset:2px}
-.workspace-tab-panels{min-height:0}
+.workspace-tab-panels{flex:0 0 auto;width:100%;min-height:auto;overflow:visible}
 .workspace-tab-panel[hidden]{display:none!important}
 .workspace-tab-panel>.panel-section:first-child{margin-top:8px}
+.sidebar{min-height:0}
+.layer-symbology-toggle{flex:0 0 auto;max-width:92px;padding:5px 6px;border:1px solid #34353b;border-radius:6px;background:#18191d;color:#c9cbd2;font-size:8px;line-height:1.2;cursor:pointer}
+.layer-symbology-toggle[aria-pressed="true"]{border-color:#a855f7;background:#211629;color:#e0c4f8}
 .map-navigation{z-index:900;pointer-events:auto}
 .map-navigation button{pointer-events:auto;touch-action:manipulation}
 @media(max-width:620px){.workspace-tabs{top:0;padding:8px 10px}.workspace-tab{min-height:42px;font-size:9px}}
@@ -103,6 +106,19 @@
 .onboarding-start{width:100%;margin-top:20px;padding:12px;border-radius:9px;font-size:12px}
 @keyframes onboarding-appear{from{opacity:0;transform:translateY(7px) scale(.99)}to{opacity:1;transform:translateY(0) scale(1)}}
 @media(max-width:480px){.onboarding-dialog{padding:26px 20px}.onboarding-dialog h2{font-size:22px}}
+@media print{
+  @page{size:A4 portrait;margin:12mm}
+  body.printing-cadastral-sheet{height:auto!important;overflow:visible!important;background:#fff!important;color:#173b4f!important}
+  body.printing-cadastral-sheet .app-shell{display:block!important;width:auto!important;height:auto!important;overflow:visible!important;background:#fff!important}
+  body.printing-cadastral-sheet .app-shell>*:not(#cadastral-sheet-dialog){display:none!important}
+  body.printing-cadastral-sheet #cadastral-sheet-dialog{position:static!important;inset:auto!important;display:block!important;width:100%!important;max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;overflow:visible!important;border:0!important;border-radius:0!important;background:#fff!important;box-shadow:none!important;color:#173b4f!important}
+  body.printing-cadastral-sheet #cadastral-sheet-dialog::backdrop,body.printing-cadastral-sheet .cadastral-sheet-toolbar{display:none!important}
+  body.printing-cadastral-sheet .cadastral-sheet-content{max-width:none!important;margin:0!important;padding:0!important;box-shadow:none!important}
+  body.printing-cadastral-sheet .cadastral-sheet-section{break-inside:avoid}
+  body.printing-cadastral-sheet .cadastral-plan-section{break-before:page;break-inside:auto}
+  body.printing-cadastral-sheet .cadastral-plan-figure svg{max-height:130mm}
+  body.printing-cadastral-sheet .cadastral-coordinate-table{font-size:8pt}
+}
 .dashboard-link{border-color:#0f718066!important;background:#e8f3f5!important;color:#0b6370!important}.dashboard-link:hover{border-color:#0f7180!important;background:#d8ecef!important}
 @media(max-width:620px){.dashboard-link{padding:8px 9px!important;font-size:9px!important}.dashboard-link span{display:none!important}}
 .uva-marker-toggle{border-color:#0f718066!important;background:#e8f3f5!important;color:#0b6370!important}
